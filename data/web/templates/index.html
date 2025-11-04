@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Resume Screening — Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav class="topbar">
+    <div class="container">
+      <h1>Resume Screening</h1>
+      <p class="muted">Fast TF-IDF matching • CSV/Excel exports • Shortlist & archive</p>
+    </div>
+  </nav>
+
+  <main class="container card">
+    <section class="form-area">
+      <h2>Find Candidates</h2>
+      <div class="row">
+        <label>Upload resumes (.pdf, .docx)</label>
+        <input id="file_input" type="file" multiple />
+        <div style="margin-top:8px">
+          <button id="uploadBtn" class="btn">Upload</button>
+        </div>
+      </div>
+      <div class="row">
+        <label>Or upload a ZIP (single file) with many resumes</label>
+        <input id="zip_input" type="file" accept=".zip" />
+        <div style="margin-top:8px">
+          <button id="uploadZipBtn" class="btn">Upload ZIP</button>
+        </div>
+      </div>
+      <div class="row">
+        <label>Job title</label>
+        <input id="job_title" placeholder="e.g. Senior Backend Engineer" />
+      </div>
+      <div class="row">
+        <label>Skills (comma separated)</label>
+        <input id="skills" placeholder="python,django,sql" />
+      </div>
+      <div class="row small">
+        <label>Top results</label>
+        <input id="top_n" type="number" min="1" max="100" value="5" />
+      </div>
+      <div class="row actions">
+        <button id="runBtn" class="btn primary">Run</button>
+        <button id="clearBtn" class="btn">Clear</button>
+      </div>
+    </section>
+
+    <section class="results-area" aria-live="polite">
+      <h2>Results</h2>
+      <div id="results" class="results"></div>
+    </section>
+  </main>
+
+  <footer class="container footer muted">
+    <small>Run the server with: <code>uvicorn data.src.webapp:app --reload</code></small>
+  </footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -76,6 +76,39 @@ D:/projects/resume_screening/.venv/Scripts/python.exe main.py --job-title "Web D
 D:/projects/resume_screening/.venv/Scripts/python.exe main.py --job-title "Data Scientist" --skills "python,pandas" --include-text --output-csv out/results_with_text.csv
 ```
 
+## Web UI & Bulk import
+
+You can run a simple web interface (FastAPI + static frontend) that allows:
+- Running the same TF-IDF scoring from your browser
+- Uploading single or multiple resume files (.pdf/.docx)
+- Uploading a single ZIP archive containing hundreds of resumes (server extracts them into `data/resume_uploads`)
+
+Run the webapp (from project root):
+
+```powershell
+# activate venv first
+.\.venv\Scripts\Activate.ps1
+# install web deps if needed
+.\.venv\Scripts\python.exe -m pip install fastapi uvicorn python-multipart
+# start the server
+D:/projects/resume_screening/.venv/Scripts/python.exe -m uvicorn data.src.webapp:app --reload
+```
+
+Using the UI:
+- Open http://127.0.0.1:8000/ in your browser.
+- Use the "Upload ZIP" button to upload a single .zip that contains many resumes (the server will extract .pdf and .docx files automatically into `data/resume_uploads/`).
+- Or use the file chooser to select multiple files at once and click "Upload".
+
+Local bulk import (fast copy of many files)
+- If you already have a local folder with many resumes, you can run the helper script to copy them into the project folder:
+
+```powershell
+D:/projects/resume_screening/.venv/Scripts/python.exe scripts/import_folder.py "C:\path\to\resumes"
+```
+
+This script copies only `.pdf` and `.docx` files and is efficient for moving hundreds of files into the app.
+
+
 ## Detailed code walkthrough (file-by-file)
 
 - `main.py` (project root): small launcher that ensures `data/src` is on `sys.path` and runs the CLI-enabled script.
