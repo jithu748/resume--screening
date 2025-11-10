@@ -1,4 +1,3 @@
-# data/src/webapp.py
 import os
 import sys
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Query, Form
@@ -54,6 +53,32 @@ app.add_middleware(
 @app.get("/")
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/api/list_uploads")
+def list_uploads():
+    """Return list of files currently saved in the server uploads folder."""
+    try:
+        files = sorted([f for f in os.listdir(UPLOADS_DIR) if os.path.isfile(os.path.join(UPLOADS_DIR, f))])
+    except Exception:
+        files = []
+    return {"files": files, "count": len(files)}
+
+
+@app.delete("/api/clear_uploads")
+def clear_uploads():
+    """Delete all files in the uploads folder (useful for testing)."""
+    removed = 0
+    errors = []
+    for name in list(os.listdir(UPLOADS_DIR)):
+        path = os.path.join(UPLOADS_DIR, name)
+        try:
+            if os.path.isfile(path):
+                os.remove(path)
+                removed += 1
+        except Exception as e:
+            errors.append(str(e))
+    return {"removed": removed, "errors": errors}
 
 
 @app.post("/api/score")
@@ -176,7 +201,6 @@ async def run_and_score(
         return JSONResponse({"error": f"Failed to save uploaded files: {e}"}, status_code=500)
 
     # Now re-use api_score logic by building a JSON-like payload and calling internal logic.
-    # We will reuse the same steps: load resumes, preprocess, vectorize, compute cosine, score and rank.
     if not job_title and not skills:
         return JSONResponse({"error": "Provide job_title or skills"}, status_code=400)
 
@@ -300,8 +324,6 @@ async def upload_zip(file: UploadFile = File(...)):
             saved.append(filename)
         except Exception as e:
             return JSONResponse({"error": f"Failed to extract {name}: {e}"}, status_code=500)
-    # debug print so you can see saved files in the server console
-    print("[UPLOAD-ZIP] extracted files:", saved)
     return {"saved": saved, "count": len(saved)}
 
 
@@ -315,7 +337,6 @@ async def upload_resumes(files: List[UploadFile] = File(...)):
         # sanitize filename
         filename = os.path.basename(f.filename)
         dest = os.path.join(save_dir, filename)
-        
 
         # avoid overwrite by adding suffix if already exists
         base, ext = os.path.splitext(filename)
@@ -334,32 +355,7 @@ async def upload_resumes(files: List[UploadFile] = File(...)):
             saved.append(final_name)
         except Exception as e:
             return JSONResponse({"error": f"Failed to save {filename}: {e}"}, status_code=500)
-    # debug print so you can see saved files in the server console
+
+    # Log saved names (helpful on server logs)
     print("[UPLOAD] saved resumes:", saved)
     return {"saved": saved, "count": len(saved)}
-
-
-# New endpoint: clear uploaded files from the server
-@app.delete("/api/clear_uploads")
-async def clear_uploads():
-    """Deletes all uploaded resume files from resume_uploads folder."""
-    removed = []
-    for f in os.listdir(UPLOADS_DIR):
-        path = os.path.join(UPLOADS_DIR, f)
-        try:
-            if os.path.isfile(path):
-                os.remove(path)
-                removed.append(f)
-        except Exception as e:
-            print(f"⚠️ Could not delete {f}: {e}")
-    print("[CLEAR] removed files:", removed)
-@app.get("/api/uploads_list")
-def uploads_list():
-    """Return list of files inside uploads folder (for debugging)."""
-    try:
-        files = [f for f in os.listdir(UPLOADS_DIR) if os.path.isfile(os.path.join(UPLOADS_DIR, f))]
-        return {"count": len(files), "files": sorted(files)}
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
-
-    return {"removed": removed, "count": len(removed)}

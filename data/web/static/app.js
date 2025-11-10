@@ -1,4 +1,6 @@
-// web/static/app.js - updated to support inline upload + numbered filenames + dark mode
+// data/web/static/app.js
+// Full client JS: upload, inline upload, refresh server list, run scoring, show numbered filenames.
+
 document.addEventListener('DOMContentLoaded', () => {
   // Elements (matching IDs from the template)
   const runBtn = document.getElementById('runBtn');
@@ -26,6 +28,24 @@ document.addEventListener('DOMContentLoaded', () => {
       return s.toFixed(3);
     }
     return String(s);
+  }
+
+  // ---- refreshServerList: ask server what files exist and render into resumeFake ----
+  async function refreshServerList() {
+    try {
+      const r = await fetch('/api/list_uploads');
+      if (!r.ok) return;
+      const data = await r.json();
+      if (!data.files || data.files.length === 0) {
+        resumeFake.innerHTML = '<em>No file selected</em>';
+        return;
+      }
+      resumeFake.innerHTML = '<ol style="margin:0;padding-left:20px">' +
+        data.files.map((f, i) => `<li><strong>${i+1}.</strong> ${f}</li>`).join('') +
+        '</ol>';
+    } catch (e) {
+      console.error('refreshServerList error', e);
+    }
   }
 
   // render results table (keeps old layout)
@@ -159,6 +179,8 @@ document.addEventListener('DOMContentLoaded', () => {
           // hide inline upload again
           const inline = document.getElementById('inline-upload');
           if (inline) inline.setAttribute('aria-hidden','true');
+          // refresh server-side file list shown to user
+          await refreshServerList();
         }
       } catch (err) {
         alert('Upload error: ' + err.message);
@@ -200,54 +222,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // ---------------------------
-  // Dark mode toggle (persistent)
-  // ---------------------------
-  (function () {
-    const storageKey = 'theme-preference';
-    const htmlEl = document.documentElement;
-    const btn = document.getElementById('themeToggle');
-    const iconSun = document.getElementById('iconSun');
-    const iconMoon = document.getElementById('iconMoon');
-
-    function applyTheme(theme) {
-      if (theme === 'dark') {
-        htmlEl.classList.add('dark');
-        if (iconMoon) iconMoon.style.display = 'inline-block';
-        if (iconSun) iconSun.style.display = 'none';
-      } else {
-        htmlEl.classList.remove('dark');
-        if (iconMoon) iconMoon.style.display = 'none';
-        if (iconSun) iconSun.style.display = 'inline-block';
-      }
-    }
-
-    // initial: saved > system > light
-    const saved = localStorage.getItem(storageKey);
-    if (saved === 'dark' || saved === 'light') {
-      applyTheme(saved);
-    } else {
-      const preferDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      applyTheme(preferDark ? 'dark' : 'light');
-    }
-
-    if (!btn) return;
-
-    btn.addEventListener('click', () => {
-      const isDark = htmlEl.classList.contains('dark');
-      const newTheme = isDark ? 'light' : 'dark';
-      applyTheme(newTheme);
-      localStorage.setItem(storageKey, newTheme);
-    });
-
-    // listen to system changes if user hasn't explicitly chosen
-    if (window.matchMedia) {
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-        const saved = localStorage.getItem(storageKey);
-        if (saved) return;
-        applyTheme(e.matches ? 'dark' : 'light');
-      });
-    }
-  })();
-
+  // On load, refresh server-side file list so user sees what is currently present
+  refreshServerList();
 });
