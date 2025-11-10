@@ -3,62 +3,216 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Resume Screening — Dashboard</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <title>Resume Screening</title>
+
+  <!-- your stylesheet -->
+  <link rel="stylesheet" href="/static/style.css?v=4">
+
+  <style>
+    .muted-small { font-size:0.85rem; color:var(--muted); margin-top:6px; }
+    /* small container for the theme toggle so it sits right in the topbar */
+    .theme-toggle {
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      border-radius:8px;
+      padding:6px 8px;
+      cursor:pointer;
+      background:transparent;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .theme-toggle svg { display:block; }
+  </style>
 </head>
 <body>
-  <nav class="topbar">
-    <div class="container">
-      <h1>Resume Screening</h1>
-      <p class="muted">Fast TF-IDF matching • CSV/Excel exports • Shortlist & archive</p>
+  <header class="topbar">
+    <div class="container" style="display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <h1>Resume Screening</h1>
+        <div class="muted">Fast TF-IDF matching • CSV/Excel exports • Shortlist & archive</div>
+      </div>
+
+      <!-- Dark mode toggle -->
+      <div>
+        <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode" type="button">
+          <svg id="iconSun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+          </svg>
+          <svg id="iconMoon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+      </div>
     </div>
-  </nav>
+  </header>
 
-  <main class="container card">
-    <section class="form-area">
-      <h2>Find Candidates</h2>
-      <div class="row">
-        <label>Upload resumes (.pdf, .docx)</label>
-        <input id="file_input" type="file" multiple />
-        <div style="margin-top:8px">
-          <button id="uploadBtn" class="btn">Upload</button>
-        </div>
-      </div>
-      <div class="row">
-        <label>Or upload a ZIP (single file) with many resumes</label>
-        <input id="zip_input" type="file" accept=".zip" />
-        <div style="margin-top:8px">
-          <button id="uploadZipBtn" class="btn">Upload ZIP</button>
-        </div>
-      </div>
-      <div class="row">
-        <label>Job title</label>
-        <input id="job_title" placeholder="e.g. Senior Backend Engineer" />
-      </div>
-      <div class="row">
-        <label>Skills (comma separated)</label>
-        <input id="skills" placeholder="python,django,sql" />
-      </div>
-      <div class="row small">
-        <label>Top results</label>
-        <input id="top_n" type="number" min="1" max="100" value="5" />
-      </div>
-      <div class="row actions">
-        <button id="runBtn" class="btn primary">Run</button>
-        <button id="clearBtn" class="btn">Clear</button>
-      </div>
-    </section>
+  <main class="container">
+    <div class="card" role="main" aria-labelledby="screening-title">
+      <section class="form-area" aria-labelledby="screening-title">
+        <h2 id="screening-title">Find Candidates</h2>
 
-    <section class="results-area" aria-live="polite">
-      <h2>Results</h2>
-      <div id="results" class="results"></div>
-    </section>
+        <!-- Upload multiple resumes (top) -->
+        <div class="row">
+          <label for="file_input">Upload resumes (.pdf, .docx)</label>
+
+          <div class="file-wrapper droppable" id="resume-wrapper" style="align-items:flex-start;">
+            <div class="fake-file" id="resume-fake" aria-live="polite">
+              <em>No file selected</em>
+            </div>
+
+            <!-- hidden input (multiple allowed) -->
+            <input id="file_input" class="file-input-hidden" type="file" multiple accept=".pdf,.docx" />
+
+            <!-- inline controls (visible; placed near the fake box) -->
+            <div class="file-controls">
+              <button type="button" id="browseBtn" class="file-btn browse">Browse</button>
+              <button type="button" id="clearBtn" class="file-btn clear">Clear</button>
+            </div>
+
+            <!-- inline upload button shown only when files selected -->
+            <div class="inline-upload" id="inline-upload" aria-hidden="true">
+              <button id="inlineUploadBtn" class="btn primary small">Upload</button>
+            </div>
+          </div>
+
+          <div class="muted-small">You can select multiple resumes (Ctrl / Shift) or drag & drop files here.</div>
+        </div>
+
+        <!-- Upload ZIP (clean) -->
+        <div class="row">
+          <label for="zip_input">Or upload a ZIP (many resumes)</label>
+          <div class="file-wrapper droppable" id="zip-wrapper">
+            <div class="fake-file" id="zip-fake">No file selected</div>
+
+            <!-- hidden zip input -->
+            <input id="zip_input" class="file-input-hidden" type="file" accept=".zip" />
+
+            <div class="file-controls">
+              <button type="button" id="zipBrowse" class="file-btn browse">Browse</button>
+              <button type="button" id="zipClear" class="file-btn clear">Clear</button>
+            </div>
+          </div>
+          <div class="muted-small">Upload a ZIP file when you want to screen many resumes at once.</div>
+        </div>
+
+        <!-- Job title -->
+        <div class="row">
+          <label for="job-title">Job title</label>
+          <input id="job-title" class="input" name="job_title" type="text" placeholder="e.g. Senior Backend Engineer" />
+        </div>
+
+        <!-- Skills -->
+        <div class="row">
+          <label for="skills">Skills (comma separated)</label>
+          <input id="skills" class="input" name="skills" type="text" placeholder="e.g. python,django,sql" />
+          <div class="muted-small">Use commas to separate multiple skills.</div>
+        </div>
+
+        <!-- Top results -->
+        <div class="row small">
+          <label for="top-n">Top results</label>
+          <input id="top-n" class="input" name="top_n" type="number" min="1" max="50" value="5">
+        </div>
+
+        <!-- Action buttons -->
+        <div class="row actions" style="margin-top:12px">
+          <button id="runBtn" class="btn primary fullwidth" type="button">Run</button>
+          <button id="resetBtn" class="btn ghost fullwidth" type="button">Clear</button>
+        </div>
+
+        <div class="hint muted">Tip: add job title and 2–4 core skills for best results.</div>
+      </section>
+
+      <aside class="results-area">
+        <h2>Results</h2>
+        <div id="results" class="results">
+          <div class="muted">No results yet — run the screening to see matches.</div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="footer">
+      <p class="muted">Run the server with: <code>uvicorn data.src.webapp:app --reload</code></p>
+    </div>
   </main>
 
-  <footer class="container footer muted">
-    <small>Run the server with: <code>uvicorn data.src.webapp:app --reload</code></small>
-  </footer>
+  <!-- main app logic -->
+  <script src="/static/app.js?v=4" defer></script>
 
-<script src="/static/app.js"></script>
+  <!-- small fallback handlers (keeps behavior robust if app.js loads late) -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const fileInput = document.getElementById('file_input');
+      const resumeFake = document.getElementById('resume-fake');
+      const browseBtn = document.getElementById('browseBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const inlineUpload = document.getElementById('inline-upload');
+      const inlineUploadBtn = document.getElementById('inlineUploadBtn');
+
+      const zipInput = document.getElementById('zip_input');
+      const zipFake = document.getElementById('zip-fake');
+      const zipBrowse = document.getElementById('zipBrowse');
+      const zipClear = document.getElementById('zipClear');
+
+      const showList = (input, fakeBox) => {
+        if (!input.files || input.files.length === 0) {
+          fakeBox.innerHTML = '<em>No file selected</em>';
+          return;
+        }
+        const list = Array.from(input.files).map((f,i) =>
+          `<li><strong>${i+1}.</strong> ${f.name}</li>`
+        ).join('');
+        fakeBox.innerHTML = `<ol style="margin:0;padding-left:20px">${list}</ol>`;
+      };
+
+      // wire UI
+      browseBtn.addEventListener('click', () => fileInput.click());
+      clearBtn.addEventListener('click', () => {
+        fileInput.value = '';
+        showList(fileInput, resumeFake);
+        inlineUpload.setAttribute('aria-hidden', 'true');
+      });
+      fileInput.addEventListener('change', () => {
+        showList(fileInput, resumeFake);
+        inlineUpload.removeAttribute('aria-hidden');
+      });
+
+      // inline upload triggers POST to /api/upload (keeps server API same)
+      inlineUploadBtn?.addEventListener('click', async () => {
+        if (!fileInput.files || fileInput.files.length === 0) return;
+        const form = new FormData();
+        for (let i=0;i<fileInput.files.length;i++) form.append('files', fileInput.files[i]);
+        inlineUploadBtn.disabled = true;
+        inlineUploadBtn.textContent = 'Uploading…';
+        try {
+          const r = await fetch('/api/upload', { method: 'POST', body: form });
+          const data = await r.json().catch(()=>({}));
+          if (!r.ok) {
+            alert('Upload failed: ' + (data.error || data.message || 'server'));
+          } else {
+            alert(`Uploaded ${data.count ?? data.saved?.length ?? 0} files`);
+            // clear selection but keep names in UI as “uploaded”
+            fileInput.value = '';
+            resumeFake.innerHTML = '<em>Uploaded ✓</em>';
+            inlineUpload.setAttribute('aria-hidden','true');
+          }
+        } catch (err) {
+          alert('Upload error: ' + err.message);
+        } finally {
+          inlineUploadBtn.disabled = false;
+          inlineUploadBtn.textContent = 'Upload';
+        }
+      });
+
+      // zip area
+      zipBrowse.addEventListener('click', () => zipInput.click());
+      zipClear.addEventListener('click', () => {
+        zipInput.value = '';
+        zipFake.innerHTML = '<em>No file selected</em>';
+      });
+      zipInput.addEventListener('change', () => showList(zipInput, zipFake));
+    });
+  </script>
 </body>
 </html>

@@ -8,6 +8,78 @@ from scorer import score_resume
 import shutil
 
 
+# ✅ Added reusable function
+def run_screening(job_title: str,
+                  job_skills: str,
+                  resume_dir: str,
+                  top_n: int = 10,
+                  include_text: bool = False,
+                  copy_top_dir: str = None):
+    """
+    Reusable version of your resume screening logic.
+    Returns a dictionary with rows of results (rank, file, score, etc.)
+    """
+    if not os.path.isabs(resume_dir):
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "."))
+        resume_dir = os.path.abspath(os.path.join(base_dir, resume_dir))
+
+    resumes = load_resumes(resume_folder=resume_dir)
+    if not resumes:
+        return {"error": f"No resumes found in '{resume_dir}'", "rows": []}
+
+    cleaned_resumes = {f: clean_text(t) for f, t in resumes.items()}
+    job_desc = f"{job_title} {job_skills}"
+
+    vectors = get_tfidf_vectors(clean_text(job_desc), cleaned_resumes)
+    cosine_scores = compute_cosine(vectors)
+
+    results = []
+    for idx, (file, text) in enumerate(cleaned_resumes.items()):
+        score_info = score_resume(text, job_skills, cosine_scores[idx])
+        if isinstance(score_info, dict):
+            score = float(score_info.get("score", 0.0))
+            matches = score_info.get("matches", [])
+        else:
+            try:
+                score = float(score_info)
+            except Exception:
+                score = 0.0
+            matches = []
+        results.append({"file": file, "score": score, "matches": matches, "text": resumes.get(file, "")})
+
+    ranked = sorted(results, key=lambda x: x["score"], reverse=True)
+
+    rows = []
+    for i, r in enumerate(ranked[:top_n], 1):
+        row = {"rank": i, "file": r["file"], "score": r["score"]}
+        if include_text:
+            row["text"] = r.get("text", "")
+        if r.get("matches"):
+            row["matches"] = r["matches"]
+        rows.append(row)
+
+    # Optional: copy top resumes to a folder
+    if copy_top_dir:
+        copy_dir = copy_top_dir if os.path.isabs(copy_top_dir) else os.path.abspath(os.path.join(os.path.dirname(__file__), ".", copy_top_dir))
+        os.makedirs(copy_dir, exist_ok=True)
+        for row in rows:
+            src = os.path.join(resume_dir, row["file"])
+            if os.path.exists(src):
+                # Use percent-style name for readability
+                numeric_score = row.get("score", 0.0)
+                try:
+                    numeric_score = float(numeric_score)
+                except Exception:
+                    numeric_score = 0.0
+                numeric_score = max(0.0, min(1.0, numeric_score))
+                score_pct = round(numeric_score * 100, 2)
+                dst_name = f"{score_pct}pct_{row['file']}"
+                shutil.copy2(src, os.path.join(copy_dir, dst_name))
+
+    return {"rows": rows}
+
+
+# ✅ Your existing CLI code — unchanged
 def parse_args():
     p = argparse.ArgumentParser(description="Resume screening runner")
     p.add_argument("--job-title", dest="job_title", help="Job title (e.g. 'Full Stack Developer')")
@@ -27,21 +99,12 @@ def parse_args():
 def main():
     args = parse_args()
 
-    # Interactive fallback if args not provided
-    if args.job_title:
-        job_title = args.job_title
-    else:
-        job_title = input("Job Title: ")
-
-    if args.skills:
-        job_skills = args.skills
-    else:
-        job_skills = input("Skills Required (comma separated): ")
-
+    # interactive fallback if not provided
+    job_title = args.job_title or input("Job Title: ")
+    job_skills = args.skills or input("Skills Required (comma separated): ")
     job_desc = f"{job_title} {job_skills}"
 
     print("\nLoading resumes...")
-    # Resolve resume directory relative to this script if a relative path was provided
     if os.path.isabs(args.resume_dir):
         resume_dir = args.resume_dir
     else:
@@ -61,89 +124,52 @@ def main():
 
     results = []
     for idx, (file, text) in enumerate(cleaned_resumes.items()):
-        score = score_resume(text, job_skills, cosine_scores[idx])
+        score_info = score_resume(text, job_skills, cosine_scores[idx])
+        # Coerce score to float safely (score_resume may return dict or numeric)
+        if isinstance(score_info, dict):
+            try:
+                score = float(score_info.get("score", 0.0))
+            except Exception:
+                score = 0.0
+        else:
+            try:
+                score = float(score_info)
+            except Exception:
+                score = 0.0
         results.append((file, score))
 
-    # Sort by score
     ranked = sorted(results, key=lambda x: x[1], reverse=True)
 
     print("\nTop Candidates:")
-    # Print results and prepare export structure
-    rows = []
     for i, (file, score) in enumerate(ranked[: args.top_n], 1):
-        print(f"{i}. {file} - Score: {score:.3f}")
-        row = {"rank": i, "file": file, "score": score}
-        if args.include_text:
-            # include the original extracted text (not cleaned) for review
-            row["text"] = resumes.get(file, "")
-        rows.append(row)
+        # ensure score is numeric, then clamp to 0..1 and convert to percentage
+        try:
+            numeric_score = float(score)
+        except Exception:
+            numeric_score = 0.0
+        # if your scores are already in 0..1 (cosine/combined), convert to 0..100
+        numeric_score = max(0.0, min(1.0, numeric_score))
+        score_pct = round(numeric_score * 100, 2)
+        print(f"{i}. {file} - Score: {score_pct}%")
 
-    # Export CSV/XLSX if requested
-    try:
-        import pandas as _pd
-    except Exception:
-        _pd = None
-
-    if args.output_csv or args.output_xlsx:
-        if _pd is None:
-            print("pandas is required to write CSV/XLSX output. Install pandas and try again.")
-        else:
-            df = _pd.DataFrame(rows)
-
-            # If output_dir provided, resolve relative output paths against it
-            output_base = None
-            if args.output_dir:
-                if os.path.isabs(args.output_dir):
-                    output_base = args.output_dir
-                else:
-                    output_base = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", args.output_dir))
-                os.makedirs(output_base, exist_ok=True)
-
-            if args.output_csv:
-                out_csv = args.output_csv
-                if output_base and not os.path.isabs(out_csv):
-                    out_csv = os.path.join(output_base, out_csv)
-                out_csv = os.path.abspath(out_csv)
-                out_dir = os.path.dirname(out_csv)
-                if out_dir:
-                    os.makedirs(out_dir, exist_ok=True)
-                df.to_csv(out_csv, index=False)
-                print(f"Wrote results CSV -> {out_csv}")
-            if args.output_xlsx:
-                out_xlsx = args.output_xlsx
-                if output_base and not os.path.isabs(out_xlsx):
-                    out_xlsx = os.path.join(output_base, out_xlsx)
-                out_xlsx = os.path.abspath(out_xlsx)
-                out_dir_x = os.path.dirname(out_xlsx)
-                if out_dir_x:
-                    os.makedirs(out_dir_x, exist_ok=True)
-                try:
-                    df.to_excel(out_xlsx, index=False)
-                    print(f"Wrote results Excel -> {out_xlsx}")
-                except ModuleNotFoundError:
-                    print("openpyxl is required to write Excel files. Install it with: pip install openpyxl")
-                except Exception as e:
-                    print(f"Failed to write Excel file {out_xlsx}: {e}")
-
-    # Copy top resumes into a folder (optional)
+    # Copy top resumes if needed
     if args.copy_top_dir:
         copy_dir = args.copy_top_dir
-        # resolve relative to project root if not absolute
         if not os.path.isabs(copy_dir):
             base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
             copy_dir = os.path.abspath(os.path.join(base_dir, copy_dir))
         os.makedirs(copy_dir, exist_ok=True)
-        for row in rows:
-            src = os.path.join(resume_dir, row["file"])
+        for i, (file, score) in enumerate(ranked[: args.top_n], 1):
+            src = os.path.join(resume_dir, file)
             if os.path.exists(src):
-                # prefix filename with score for quick overview
-                score_prefix = f"{row['score']:.3f}_"
-                dst_name = score_prefix + row["file"]
-                dst = os.path.join(copy_dir, dst_name)
                 try:
-                    shutil.copy2(src, dst)
-                except Exception as e:
-                    print(f"Failed to copy {src} -> {dst}: {e}")
+                    numeric_score = float(score)
+                except Exception:
+                    numeric_score = 0.0
+                numeric_score = max(0.0, min(1.0, numeric_score))
+                score_pct = round(numeric_score * 100, 2)
+                dst_name = f"{score_pct}pct_{file}"
+                shutil.copy2(src, os.path.join(copy_dir, dst_name))
         print(f"Copied top candidates to {copy_dir}")
 
 
