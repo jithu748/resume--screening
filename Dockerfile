@@ -20,8 +20,8 @@ RUN python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); 
 # Copy application
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p data/resume_uploads data/shortlisted
+# Create necessary directories (ignore if already exist)
+RUN mkdir -p data/resume_uploads 2>/dev/null || true
 
 # Expose port
 EXPOSE 8000
