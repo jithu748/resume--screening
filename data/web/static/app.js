@@ -1,7 +1,11 @@
 // data/web/static/app.js
-// Full client JS: upload, inline upload, refresh server list, run scoring, show numbered filenames.
+// Client JS with session-based upload support for privacy/security
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Session storage for uploaded files
+  let currentSessionId = null;
+  let sessionStatusTimer = null;
+
   // Elements (matching IDs from the template)
   const runBtn = document.getElementById('runBtn');
   const resetBtn = document.getElementById('resetBtn');
@@ -12,6 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const browseBtn = document.getElementById('browseBtn');
   const clearBtn = document.getElementById('clearBtn');
   const inlineUploadBtn = document.getElementById('inlineUploadBtn');
+
+  const sessionIdEl = document.getElementById('session-id');
+  const sessionFilesEl = document.getElementById('session-files');
+  const endSessionBtn = document.getElementById('endSessionBtn');
 
   const zipInput = document.getElementById('zip_input');
   const zipFake = document.getElementById('zip-fake');
@@ -30,21 +38,37 @@ document.addEventListener('DOMContentLoaded', () => {
     return String(s);
   }
 
-  // ---- refreshServerList: ask server what files exist and render into resumeFake ----
+  // ---- refreshServerList: deprecated - now shows session status ----
   async function refreshServerList() {
+    if (!currentSessionId) {
+      resumeFake.innerHTML = '<em>No file selected</em>';
+      if (sessionIdEl) sessionIdEl.textContent = 'No session';
+      if (sessionFilesEl) sessionFilesEl.innerHTML = '<em>No files</em>';
+      if (endSessionBtn) { endSessionBtn.disabled = true; }
+      return;
+    }
     try {
-      const r = await fetch('/api/list_uploads');
-      if (!r.ok) return;
+      const r = await fetch(`/api/session_status?session_id=${encodeURIComponent(currentSessionId)}`);
       const data = await r.json();
-      if (!data.files || data.files.length === 0) {
-        resumeFake.innerHTML = '<em>No file selected</em>';
+      if (!r.ok) {
+        resumeFake.innerHTML = '<em>Session expired - please re-upload files</em>';
+        currentSessionId = null;
+        if (sessionIdEl) sessionIdEl.textContent = 'No session';
+        if (sessionFilesEl) sessionFilesEl.innerHTML = '<em>No files</em>';
+        if (endSessionBtn) { endSessionBtn.disabled = true; }
         return;
       }
-      resumeFake.innerHTML = '<ol style="margin:0;padding-left:20px">' +
-        data.files.map((f, i) => `<li><strong>${i+1}.</strong> ${f}</li>`).join('') +
-        '</ol>';
+      const files = data.files || [];
+      const items = files.map((f,i) => `<li><strong>${i+1}.</strong> ${f}</li>`).join('');
+      const ttl = typeof data.expires_in === 'number' ? Math.max(0, Math.floor(data.expires_in/60)) : null;
+      const ttlMsg = ttl !== null ? ` (expires in ~${ttl} min)` : '';
+      resumeFake.innerHTML = `<div style="color: green;">✓ ${files.length} files uploaded${ttlMsg}</div>` +
+        `<ol style="margin:0;padding-left:20px">${items}</ol>`;
+      if (sessionIdEl) sessionIdEl.textContent = `Session: ${currentSessionId.substring(0, 8)}`;
+      if (sessionFilesEl) sessionFilesEl.innerHTML = `<strong>${files.length}</strong> file(s): <ul style="margin:6px 0 0 18px">${files.map(f=>`<li>${f}</li>`).join('')}</ul>`;
+      if (endSessionBtn) { endSessionBtn.disabled = false; }
     } catch (e) {
-      console.error('refreshServerList error', e);
+      resumeFake.innerHTML = '<em>Unable to load session status</em>';
     }
   }
 
@@ -80,28 +104,52 @@ document.addEventListener('DOMContentLoaded', () => {
     resultsEl.appendChild(table);
   }
 
-  // RUN button (calls /api/score)
+  // RUN button (calls /api/score with session_id)
   if (runBtn) {
     runBtn.addEventListener('click', async () => {
       const job_title = document.getElementById('job-title')?.value.trim() || '';
       const skills = document.getElementById('skills')?.value.trim() || '';
       const top_n = parseInt(document.getElementById('top-n')?.value || '5', 10) || 5;
-      if (!skills && !job_title) { alert('Please add job title or skills'); return; }
+      
+      if (!skills && !job_title) {
+        alert('Please add job title or skills');
+        return;
+      }
+
+      if (!currentSessionId) {
+        alert('Please upload resumes first!');
+        return;
+      }
 
       runBtn.disabled = true;
       runBtn.textContent = 'Running…';
       resultsEl.innerHTML = '<p class="muted">Running... please wait.</p>';
+      
       try {
         const resp = await fetch('/api/score', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ job_title, skills, top_n })
+          body: JSON.stringify({
+            job_title,
+            skills,
+            top_n,
+            session_id: currentSessionId
+          })
         });
         const data = await resp.json();
         if (!resp.ok) {
           resultsEl.innerHTML = `<p class="muted">Error: ${data.error || data.message || 'server'}</p>`;
+          // Session expired - clear it
+          if (data.error && data.error.includes('session')) {
+            currentSessionId = null;
+            resumeFake.innerHTML = '<em>Session expired - please re-upload files</em>';
+          }
           return;
         }
+        
+        // Success! Session remains active until TTL expiry (sliding)
+        await refreshServerList();
+        
         const rows = data.results ?? data.rows ?? [];
         const normalized = rows.map(r => ({
           file: r.file ?? r.filename ?? r.name,
@@ -119,17 +167,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Reset button (clear form UI only)
+  // Reset button (clear form UI and session)
   if (resetBtn) {
     resetBtn.addEventListener('click', () => {
       document.getElementById('job-title').value = '';
       document.getElementById('skills').value = '';
       document.getElementById('top-n').value = 5;
       fileInput.value = '';
-      resumeFake.innerHTML = '<em>No file selected</em>';
       zipInput.value = '';
-      zipFake.innerHTML = '<em>No file selected</em>';
       resultsEl.innerHTML = '';
+      currentSessionId = null;
+      resumeFake.innerHTML = '<em>No file selected</em>';
+      zipFake.innerHTML = '<em>No file selected</em>';
     });
   }
 
@@ -159,28 +208,48 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Inline upload handler (uploads files selected in file_input to /api/upload)
+  // Inline upload handler (uploads files and stores session_id)
   if (inlineUploadBtn) {
     inlineUploadBtn.addEventListener('click', async () => {
-      if (!fileInput.files || fileInput.files.length === 0) { alert('No files selected'); return; }
+      if (!fileInput.files || fileInput.files.length === 0) {
+        alert('No files selected');
+        return;
+      }
+      
       const form = new FormData();
-      for (let i=0;i<fileInput.files.length;i++) form.append('files', fileInput.files[i]);
+      for (let i = 0; i < fileInput.files.length; i++) {
+        form.append('files', fileInput.files[i]);
+      }
+      if (currentSessionId) {
+        form.append('session_id', currentSessionId);
+      }
+      
       inlineUploadBtn.disabled = true;
       inlineUploadBtn.textContent = 'Uploading…';
+      
       try {
         const resp = await fetch('/api/upload', { method: 'POST', body: form });
-        const data = await resp.json().catch(()=>({}));
+        const data = await resp.json().catch(() => ({}));
+        
         if (!resp.ok) {
           alert('Upload failed: ' + (data?.error || data?.message || 'server'));
         } else {
-          alert(`Uploaded ${data.count ?? data.saved?.length ?? 0} files`);
+          // Store/refresh session ID and render list of uploaded files
+          currentSessionId = data.session_id;
+          const files = data.files ?? data.saved ?? [];
+          const count = data.count ?? files.length ?? 0;
+          alert(`Uploaded ${count} files. Session ${currentSessionId.substring(0, 8)} created/updated.`);
           fileInput.value = '';
-          resumeFake.innerHTML = '<em>Uploaded ✓</em>';
-          // hide inline upload again
+          const items = files.map((f,i) => `<li><strong>${i+1}.</strong> ${f}</li>`).join('');
+          resumeFake.innerHTML = `<div style=\"color: green;\">✓ ${count} files uploaded (session active)</div>` +
+            `<ol style=\"margin:0;padding-left:20px\">${items}</ol>`;
+          if (sessionIdEl) sessionIdEl.textContent = `Session: ${currentSessionId.substring(0, 8)}`;
+          if (sessionFilesEl) sessionFilesEl.innerHTML = `<strong>${files.length}</strong> file(s): <ul style=\"margin:6px 0 0 18px\">${files.map(f=>`<li>${f}</li>`).join('')}</ul>`;
+          if (endSessionBtn) { endSessionBtn.disabled = false; }
+          
+          // Hide inline upload button
           const inline = document.getElementById('inline-upload');
-          if (inline) inline.setAttribute('aria-hidden','true');
-          // refresh server-side file list shown to user
-          await refreshServerList();
+          if (inline) inline.setAttribute('aria-hidden', 'true');
         }
       } catch (err) {
         alert('Upload error: ' + err.message);
@@ -222,6 +291,33 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // On load, refresh server-side file list so user sees what is currently present
+  // On load, show initial empty state
   refreshServerList();
+
+  // End Session handler
+  if (endSessionBtn) {
+    endSessionBtn.addEventListener('click', async () => {
+      if (!currentSessionId) return;
+      endSessionBtn.disabled = true;
+      try {
+        // Prefer POST /api/end_session for manual end
+        const resp = await fetch('/api/end_session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: currentSessionId })
+        });
+        if (!resp.ok) {
+          // Fallback to DELETE endpoint if needed
+          await fetch(`/api/session?session_id=${encodeURIComponent(currentSessionId)}`, { method: 'DELETE' });
+        } else {
+          await resp.json().catch(()=>({}));
+        }
+      } catch {}
+      currentSessionId = null;
+      resumeFake.innerHTML = '<em>Session ended. Please re-upload files.</em>';
+      if (sessionIdEl) sessionIdEl.textContent = 'No session';
+      if (sessionFilesEl) sessionFilesEl.innerHTML = '<em>No files</em>';
+      endSessionBtn.disabled = true;
+    });
+  }
 });

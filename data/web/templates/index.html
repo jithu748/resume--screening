@@ -79,6 +79,19 @@
           <div class="muted-small">You can select multiple resumes (Ctrl / Shift) or drag & drop files here.</div>
         </div>
 
+        <!-- Session status and controls -->
+        <div class="row">
+          <label>Session</label>
+          <div id="session-status" class="fake-file" style="display:block">
+            <div id="session-id" class="muted">No session</div>
+            <div id="session-files" class="muted" style="margin-top:6px"><em>No files</em></div>
+            <div style="margin-top:8px">
+              <button id="endSessionBtn" class="btn ghost" type="button" disabled>End Session</button>
+            </div>
+          </div>
+          <div class="muted-small">Your files are isolated to this session and auto-expire after inactivity.</div>
+        </div>
+
         <!-- Upload ZIP (clean) -->
         <div class="row">
           <label for="zip_input">Or upload a ZIP (many resumes)</label>
