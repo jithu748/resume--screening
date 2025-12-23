@@ -41,7 +41,9 @@ regex==2025.10.23
 requests==2.32.5
 safetensors==0.6.2
 scikit-learn==1.7.2
-scipy==1.16.3
+# scipy 1.16.x requires Python >=3.11; use 1.11.4 on Py<3.11
+scipy==1.16.3; python_version >= "3.11"
+scipy==1.11.4; python_version < "3.11"
 sentence-transformers==5.1.2
 setuptools==80.9.0
 six==1.17.0
