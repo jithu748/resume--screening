@@ -4,8 +4,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   // ===== Dark Mode Toggle =====
   const themeToggle = document.getElementById('themeToggle');
-  const iconSun = document.getElementById('iconSun');
-  const iconMoon = document.getElementById('iconMoon');
+  const iconLabel = document.getElementById('iconLabel');
   const htmlElement = document.documentElement;
 
   // Initialize theme from localStorage or system preference
@@ -28,12 +27,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function applyTheme(isDarkMode) {
     if (isDarkMode) {
       htmlElement.classList.add('dark');
-      iconSun?.style.setProperty('display', 'none');
-      iconMoon?.style.setProperty('display', 'block');
+      if (iconLabel) iconLabel.textContent = '☀️';
     } else {
       htmlElement.classList.remove('dark');
-      iconSun?.style.setProperty('display', 'block');
-      iconMoon?.style.setProperty('display', 'none');
+      if (iconLabel) iconLabel.textContent = '🌙';
     }
     // Persist preference
     localStorage.setItem('theme-preference', isDarkMode ? 'dark' : 'light');

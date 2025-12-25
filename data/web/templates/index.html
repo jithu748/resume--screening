@@ -10,29 +10,32 @@
 
   <style>
     .muted-small { font-size:0.85rem; color:var(--muted); margin-top:6px; }
-    /* small container for the theme toggle so it sits right in the topbar */
+    /* Dark mode toggle button - highly visible */
     .theme-toggle {
       display:inline-flex;
       align-items:center;
       justify-content:center;
-      gap:8px;
+      gap:6px;
       border-radius:8px;
-      padding:8px 12px;
+      padding:10px 14px;
       cursor:pointer;
-      background:rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
       color: #fff;
+      font-size: 20px;
+      font-weight: bold;
       transition: all 200ms ease;
+      min-width: 44px;
+      min-height: 44px;
     }
     .theme-toggle:hover {
-      background:rgba(255,255,255,0.18);
-      border-color:rgba(255,255,255,0.3);
-      transform: scale(1.05);
+      background:rgba(255,255,255,0.25);
+      border-color:rgba(255,255,255,0.35);
+      transform: scale(1.08);
     }
     .theme-toggle:active {
-      transform: scale(0.98);
+      transform: scale(0.95);
     }
-    .theme-toggle svg { display:block; stroke: currentColor; }
   </style>
 </head>
 <body>
@@ -46,13 +49,7 @@
       <!-- Dark mode toggle -->
       <div>
         <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode" type="button">
-          <svg id="iconSun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
-            <circle cx="12" cy="12" r="4"></circle>
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
-          </svg>
-          <svg id="iconMoon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-          </svg>
+          <span id="iconLabel">🌙</span>
         </button>
       </div>
     </div>
