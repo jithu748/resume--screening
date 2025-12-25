@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       const files = data.files || [];
-      const items = files.map((f,i) => `<li><strong>${i+1}.</strong> ${f}</li>`).join('');
+      const items = files.map((f) => `<li>${f}</li>`).join('');
       const ttl = typeof data.expires_in === 'number' ? Math.max(0, Math.floor(data.expires_in/60)) : null;
       const ttlMsg = ttl !== null ? ` (expires in ~${ttl} min)` : '';
       resumeFake.innerHTML = `<div style="color: green;">✓ ${files.length} files uploaded${ttlMsg}</div>` +
