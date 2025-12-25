@@ -17,9 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const clearBtn = document.getElementById('clearBtn');
   const inlineUploadBtn = document.getElementById('inlineUploadBtn');
 
-  const sessionIdEl = document.getElementById('session-id');
-  const sessionFilesEl = document.getElementById('session-files');
-  const endSessionBtn = document.getElementById('endSessionBtn');
+
 
   const zipInput = document.getElementById('zip_input');
   const zipFake = document.getElementById('zip-fake');
@@ -38,13 +36,12 @@ document.addEventListener('DOMContentLoaded', () => {
     return String(s);
   }
 
-  // ---- refreshServerList: deprecated - now shows session status ----
+  // ---- refreshServerList: update resume list display (session state kept in memory) ----
   async function refreshServerList() {
+    // Session info is no longer displayed in UI, but currentSessionId is maintained
+    // for API calls. This function is minimal now but kept for extensibility.
     if (!currentSessionId) {
       resumeFake.innerHTML = '<em>No file selected</em>';
-      if (sessionIdEl) sessionIdEl.textContent = 'No session';
-      if (sessionFilesEl) sessionFilesEl.innerHTML = '<em>No files</em>';
-      if (endSessionBtn) { endSessionBtn.disabled = true; }
       return;
     }
     try {
@@ -53,9 +50,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!r.ok) {
         resumeFake.innerHTML = '<em>Session expired - please re-upload files</em>';
         currentSessionId = null;
-        if (sessionIdEl) sessionIdEl.textContent = 'No session';
-        if (sessionFilesEl) sessionFilesEl.innerHTML = '<em>No files</em>';
-        if (endSessionBtn) { endSessionBtn.disabled = true; }
         return;
       }
       const files = data.files || [];
@@ -64,9 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const ttlMsg = ttl !== null ? ` (expires in ~${ttl} min)` : '';
       resumeFake.innerHTML = `<div style="color: green;">✓ ${files.length} files uploaded${ttlMsg}</div>` +
         `<ol style="margin:0;padding-left:20px">${items}</ol>`;
-      if (sessionIdEl) sessionIdEl.textContent = `Session: ${currentSessionId.substring(0, 8)}`;
-      if (sessionFilesEl) sessionFilesEl.innerHTML = `<strong>${files.length}</strong> file(s): <ul style="margin:6px 0 0 18px">${files.map(f=>`<li>${f}</li>`).join('')}</ul>`;
-      if (endSessionBtn) { endSessionBtn.disabled = false; }
     } catch (e) {
       resumeFake.innerHTML = '<em>Unable to load session status</em>';
     }
@@ -243,9 +234,6 @@ document.addEventListener('DOMContentLoaded', () => {
           const items = files.map((f,i) => `<li><strong>${i+1}.</strong> ${f}</li>`).join('');
           resumeFake.innerHTML = `<div style=\"color: green;\">✓ ${count} files uploaded (session active)</div>` +
             `<ol style=\"margin:0;padding-left:20px\">${items}</ol>`;
-          if (sessionIdEl) sessionIdEl.textContent = `Session: ${currentSessionId.substring(0, 8)}`;
-          if (sessionFilesEl) sessionFilesEl.innerHTML = `<strong>${files.length}</strong> file(s): <ul style=\"margin:6px 0 0 18px\">${files.map(f=>`<li>${f}</li>`).join('')}</ul>`;
-          if (endSessionBtn) { endSessionBtn.disabled = false; }
           
           // Hide inline upload button
           const inline = document.getElementById('inline-upload');
@@ -294,30 +282,4 @@ document.addEventListener('DOMContentLoaded', () => {
   // On load, show initial empty state
   refreshServerList();
 
-  // End Session handler
-  if (endSessionBtn) {
-    endSessionBtn.addEventListener('click', async () => {
-      if (!currentSessionId) return;
-      endSessionBtn.disabled = true;
-      try {
-        // Prefer POST /api/end_session for manual end
-        const resp = await fetch('/api/end_session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: currentSessionId })
-        });
-        if (!resp.ok) {
-          // Fallback to DELETE endpoint if needed
-          await fetch(`/api/session?session_id=${encodeURIComponent(currentSessionId)}`, { method: 'DELETE' });
-        } else {
-          await resp.json().catch(()=>({}));
-        }
-      } catch {}
-      currentSessionId = null;
-      resumeFake.innerHTML = '<em>Session ended. Please re-upload files.</em>';
-      if (sessionIdEl) sessionIdEl.textContent = 'No session';
-      if (sessionFilesEl) sessionFilesEl.innerHTML = '<em>No files</em>';
-      endSessionBtn.disabled = true;
-    });
-  }
 });
