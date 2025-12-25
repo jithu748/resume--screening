@@ -3,7 +3,7 @@ import sys
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException, Query, Form
 import io
 import zipfile
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +14,7 @@ import uuid
 from contextlib import contextmanager
 import threading
 import time
+import mimetypes
 
 
 # ensure local src folder is on sys.path so imports like `import extract_text` work
@@ -254,6 +255,55 @@ app.add_middleware(
 @app.get("/")
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/view/{session_id}/{filename}")
+async def view_resume(session_id: str, filename: str):
+    """
+    Serve a resume file for viewing in the browser.
+    Returns the file with appropriate content-type for PDF/DOCX.
+    """
+    # Validate session
+    if not _is_session_valid(session_id):
+        raise HTTPException(status_code=404, detail="Session expired or invalid")
+    
+    # Get session directory
+    session_dir = _get_session_dir(session_id)
+    if not session_dir:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Construct file path
+    file_path = os.path.join(session_dir, filename)
+    
+    # Security check - ensure file is within session directory
+    if not os.path.abspath(file_path).startswith(os.path.abspath(session_dir)):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Check if file exists
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Determine content type
+    content_type, _ = mimetypes.guess_type(file_path)
+    if not content_type:
+        # Default based on extension
+        if filename.lower().endswith('.pdf'):
+            content_type = 'application/pdf'
+        elif filename.lower().endswith('.docx'):
+            content_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        else:
+            content_type = 'application/octet-stream'
+    
+    # Touch session to extend TTL
+    _touch_session(session_id)
+    
+    # Return file with inline disposition for browser viewing
+    return FileResponse(
+        path=file_path,
+        media_type=content_type,
+        filename=filename,
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )
 
 
 @app.get("/api/list_uploads")

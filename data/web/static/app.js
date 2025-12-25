@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // render results table (keeps old layout)
+  // render results table (with View action)
   function renderResults(rows) {
     resultsEl.innerHTML = '';
     if (!rows || rows.length === 0) {
@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const table = document.createElement('table');
     table.className = 'table';
     const thead = document.createElement('thead');
-    thead.innerHTML = '<tr><th>Use-case</th><th>File</th><th>Score</th></tr>';
+    thead.innerHTML = '<tr><th>Use-case</th><th>File</th><th>Score</th><th>Action</th></tr>';
     table.appendChild(thead);
     const tbody = document.createElement('tbody');
     rows.forEach(r => {
@@ -131,9 +131,28 @@ document.addEventListener('DOMContentLoaded', () => {
       scoreTd.className = 'score';
       const s = (typeof r.score === 'number' || typeof r.score === 'string') ? r.score : (r.score && r.score.value) || r.score;
       scoreTd.textContent = formatScore(s);
+      
+      // Add View button
+      const actionTd = document.createElement('td');
+      const viewBtn = document.createElement('button');
+      viewBtn.className = 'btn ghost small';
+      viewBtn.textContent = 'View';
+      viewBtn.style.padding = '6px 12px';
+      viewBtn.style.fontSize = '0.85rem';
+      const filename = r.file || r.filename;
+      if (filename && currentSessionId) {
+        viewBtn.addEventListener('click', () => {
+          window.open(`/view/${encodeURIComponent(currentSessionId)}/${encodeURIComponent(filename)}`, '_blank');
+        });
+      } else {
+        viewBtn.disabled = true;
+      }
+      actionTd.appendChild(viewBtn);
+      
       tr.appendChild(useTd);
       tr.appendChild(fileTd);
       tr.appendChild(scoreTd);
+      tr.appendChild(actionTd);
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
