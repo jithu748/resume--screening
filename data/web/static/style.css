@@ -221,6 +221,16 @@ label{font-size:0.92rem;color:var(--muted);margin-bottom:6px;font-weight:600}
   border-color: rgba(255,255,255,0.04);
 }
 
+.dark .results,
+.dark .results table,
+.dark .results thead,
+.dark .results tbody,
+.dark .results tr,
+.dark .results td,
+.dark .results th {
+  background: var(--card);
+}
+
 .dark .table tr {
   background: var(--card);
 }
