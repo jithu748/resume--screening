@@ -221,6 +221,14 @@ label{font-size:0.92rem;color:var(--muted);margin-bottom:6px;font-weight:600}
   border-color: rgba(255,255,255,0.04);
 }
 
+.dark .table tr {
+  background: var(--card);
+}
+
+.dark .table tr:hover {
+  background: rgba(255,255,255,0.02);
+}
+
 .dark .result-item {
   background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
   box-shadow: 0 6px 18px rgba(2,6,23,0.6);
@@ -229,6 +237,14 @@ label{font-size:0.92rem;color:var(--muted);margin-bottom:6px;font-weight:600}
 .dark .fake-file {
   border-style: dashed;
   border-color: rgba(255,255,255,0.06);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background-color: rgba(255,255,255,0.15);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255,255,255,0.25);
 }
 
 /* smooth theme switch */
