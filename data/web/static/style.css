@@ -1,7 +1,7 @@
 /* ================================
    Resume Screening Dashboard UI
    Modern, clean, balanced look
-   v2.1 - final fixed & dark-mode safe
+   v2 - unified & polished
    ================================ */
 
 /* ----- Variables ----- */
@@ -29,7 +29,7 @@ body{
   -moz-osx-font-smoothing:grayscale;
 }
 
-/* ---------- Topbar ---------- */
+/* ---------- Topbar (Professional gradient) ---------- */
 .topbar {
   background: linear-gradient(90deg, #0b1b3a 0%, #0b59a6 45%, #0b78d1 100%);
   color: #fff;
@@ -42,13 +42,22 @@ body{
   margin: 0;
   font-size: 1.5rem;
   font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
 .topbar .muted {
   opacity: 0.9;
   font-size: 0.9rem;
+  margin-top: 4px;
   color: #e0e7ff;
 }
+
+@media (max-width: 600px) {
+  .topbar h1 {
+    font-size: 1.2rem;
+  }
+}
+
 
 /* ---------- Layout ---------- */
 .container{max-width:980px;margin:0 auto;padding:0 18px}
@@ -63,151 +72,193 @@ body{
 }
 @media(max-width:900px){.card{grid-template-columns:1fr}}
 
-/* ---------- Form ---------- */
+/* ---------- Form area ---------- */
+.form-area h2{margin-bottom:12px;font-size:1.05rem}
 .row{margin-bottom:16px;display:flex;flex-direction:column;gap:6px}
-label{font-size:0.92rem;color:var(--muted);font-weight:600}
-
-.input, input, textarea {
-  padding:10px 12px;
-  border-radius:10px;
-  border:1px solid var(--border);
-  background:#fbfdff;
+.row.small{max-width:160px}
+label{font-size:0.92rem;color:var(--muted);margin-bottom:6px;font-weight:600}
+.input, input[type="text"], input[type="number"], textarea {
+  padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#fbfdff;font-size:0.95rem;
+}
+.input:focus, input:focus, textarea:focus{
+  outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba(11,120,209,0.08);
 }
 
-/* ---------- Buttons ---------- */
+/* ---------- File upload controls ---------- */
+.file-wrapper{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .file-btn, .btn{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  min-height:44px;
-  padding:10px 16px;
-  border-radius:12px;
-  border:none;
-  font-weight:700;
-  cursor:pointer;
-  background:#fff;
-  color:#0f172a;
-  box-shadow:0 6px 18px rgba(17,24,39,0.04);
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-height:44px;padding:10px 16px;border-radius:12px;border:none;font-weight:700;
+  font-size:0.95rem;transition:transform var(--transition), box-shadow var(--transition),opacity var(--transition);
+  cursor:pointer;background:#fff;color:#0f172a;box-shadow:0 6px 18px rgba(17,24,39,0.04);
 }
+.file-btn.browse{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;box-shadow:0 10px 26px rgba(11,120,209,0.14)}
+.file-btn.clear{background:#fff;border:1px solid #e6eef8;color:#374151}
+.file-btn:hover, .btn:hover{transform:translateY(-3px);box-shadow:0 14px 36px rgba(17,24,39,0.08)}
+.file-btn:active, .btn:active{transform:translateY(-1px);box-shadow:0 8px 22px rgba(17,24,39,0.06)}
+.file-btn:disabled{opacity:0.6;cursor:not-allowed;box-shadow:none}
 
-.btn.primary{
-  background:linear-gradient(135deg,var(--accent),var(--accent-2));
-  color:#fff;
-}
-
-.btn.ghost{
-  background:#fff;
-  border:1px solid #e6eef8;
-  color:#374151;
-}
-
-/* ---------- Fake file ---------- */
+/* fake-file area (shows numbered list or filename) */
 .fake-file{
-  min-height:56px;
-  padding:12px 14px;
-  border-radius:12px;
-  border:1px dashed #dbeaf7;
-  background:#fff;
+  flex:1 1 100%;min-height:56px;padding:12px 14px;border-radius:12px;border:1px dashed #dbeaf7;background:#fff;
+  color:#111827;font-size:0.95rem;overflow:auto;
+  box-shadow:0 6px 14px rgba(12,30,50,0.03);
 }
-
 .fake-file ol{margin:0;padding-left:18px}
-.fake-file li{margin:6px 0}
+.fake-file li{margin:6px 0;font-size:0.95rem}
+.fake-file li strong{color:#0b4c86;margin-right:6px}
+
+/* drag visual */
+.droppable.over{border:2px dashed var(--accent);background:linear-gradient(90deg,rgba(11,120,209,0.05),rgba(11,120,209,0.02))}
+
+/* ---------- Actions (Run / Clear) ---------- */
+.actions{display:flex;flex-direction:column;gap:12px;margin-top:6px}
+@media(min-width:880px){.actions.horizontal{flex-direction:row;align-items:center}.actions.horizontal .btn{min-width:120px}}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border:none;box-shadow:0 10px 28px rgba(11,120,209,0.18)}
+.btn.ghost{background:#fff;border:1px solid #e6eef8;color:#374151;box-shadow:0 6px 14px rgba(12,30,50,0.04)}
+.btn.fullwidth{width:100%}
 
 /* ---------- Results ---------- */
-.results{
-  border:1px solid var(--border);
-  border-radius:10px;
-  background:#fbfdff;
-  min-height:200px;
-  padding:16px;
-}
+.results-area h2{margin-bottom:12px}
+.results{border:1px solid var(--border);border-radius:10px;background:#fbfdff;min-height:200px;padding:16px;font-size:0.95rem}
+.results .muted{color:var(--muted);text-align:center;margin-top:26px}
 
-/* ---------- TABLE ---------- */
-.table{width:100%;border-collapse:collapse}
-.table th{
-  padding:10px;
-  border-bottom:2px solid #e5e7eb;
-  color:#374151;
-  font-weight:700;
-}
-.table td{
-  padding:10px;
-  border-bottom:1px solid #eef2f6;
-}
+/* results item */
+.result-item{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:10px;background:linear-gradient(180deg,#fff,#fbfdff);margin-bottom:10px;box-shadow:0 6px 14px rgba(12,30,50,0.02)}
+.score-badge{font-weight:700;padding:8px 10px;border-radius:8px;background:linear-gradient(90deg,#e6f2ff,#d7ecff);color:var(--accent)}
+
+/* table fallback */
+.table{width:100%;border-collapse:collapse;margin-top:8px}
+.table th{padding:10px;border-bottom:2px solid #e5e7eb;text-align:left;color:#374151;font-weight:700}
+.table td{padding:10px;border-bottom:1px solid #eef2f6}
 .table tr:hover{background:#f9fbfd}
 
-/* ===== FIX 1: RESULT FILE LINK ===== */
-.result-file-link{
-  color:var(--accent);
-  text-decoration:none;
-  font-weight:600;
-}
-.result-file-link:hover{
-  text-decoration:underline;
+/* ---------- Footer & utils ---------- */
+.footer{text-align:center;color:var(--muted);font-size:0.85rem;margin-top:18px;padding:12px 0}
+.muted{color:var(--muted)}
+.hint{margin-top:8px;color:var(--muted);font-size:0.9rem}
+
+/* ---------- Accessibility & small polish ---------- */
+.btn:focus-visible, .file-btn:focus-visible, input:focus{outline:3px solid rgba(11,120,209,0.12);outline-offset:2px}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background-color:rgba(17,24,39,0.15);border-radius:10px}
+::-webkit-scrollbar-thumb:hover{background-color:rgba(17,24,39,0.25)}
+@media(max-width:540px){.fake-file{min-height:80px}.actions{gap:14px}.btn,.file-btn{width:100%;justify-content:center}}
+
+.file-input-hidden {
+  display: none !important;
+  visibility: hidden;
+  width: 0;
+  height: 0;
+  position: absolute;
 }
 
-/* ===== FIX 2: VIEW BUTTON ===== */
-.view-btn{
-  padding:6px 14px;
-  background:linear-gradient(135deg,var(--accent),var(--accent-2));
-  color:#fff !important;
-  border-radius:8px;
-  font-size:0.85rem;
-  text-decoration:none;
-}
-.view-btn:hover{
-  opacity:0.9;
+.file-input-hidden {
+  display: none !important;
 }
 
-/* ---------- Footer ---------- */
-.footer{text-align:center;color:var(--muted);font-size:0.85rem;margin-top:18px}
 
-/* =======================
-   DARK MODE
-   ======================= */
-.dark{
-  --bg:#0b1220;
-  --card:#0f1724;
-  --accent:#4aa3ff;
-  --accent-2:#0b78d1;
-  --muted:#98a0b3;
-  --border:#1f2937;
-  --shadow:0 8px 30px rgba(2,6,23,0.6);
-  color-scheme:dark;
+/* -------------------------
+   Dark mode variables & styles
+   ------------------------- */
+
+/* default variables already defined in :root - we only override in .dark */
+.dark {
+  --bg: #0b1220;
+  --card: #0f1724;
+  --accent: #4aa3ff;
+  --accent-2: #0b78d1;
+  --muted: #98a0b3;
+  --border: #1f2937;
+  --shadow: 0 8px 30px rgba(2,6,23,0.6);
+  color-scheme: dark;
 }
 
-.dark body{background:var(--bg);color:#e6eef8}
+/* elements that need explicit dark replacements */
+.dark body {
+  background: var(--bg);
+  color: #e6eef8;
+}
 
 .dark .card,
 .dark .fake-file,
 .dark .results,
-.dark input{
-  background:var(--card);
-  border-color:rgba(255,255,255,0.06);
-  color:#e6eef8;
+.dark input,
+.dark textarea {
+  background: var(--card);
+  border-color: rgba(255,255,255,0.06);
+  color: #e6eef8;
+}
+
+.dark .topbar {
+  background: linear-gradient(90deg, #051027 0%, #073b6b 45%, #074f9a 100%);
+  box-shadow: 0 6px 22px rgba(2,6,23,0.6);
+}
+
+.dark label,
+.dark .muted,
+.dark .muted-small,
+.dark .hint {
+  color: var(--muted);
+}
+
+.dark .file-btn.browse,
+.dark .btn.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #04233f;
+}
+
+.dark .file-btn.clear,
+.dark .btn.ghost {
+  background: rgba(255,255,255,0.03);
+  color: var(--muted);
+  border: 1px solid rgba(255,255,255,0.04);
 }
 
 .dark .table th,
-.dark .table td{
-  color:#dbeafe;
-  border-color:rgba(255,255,255,0.05);
+.dark .table td {
+  color: #dbeafe;
+  border-color: rgba(255,255,255,0.04);
 }
 
-.dark .table tr:hover{
-  background:rgba(255,255,255,0.03);
+.dark .results,
+.dark .results table,
+.dark .results thead,
+.dark .results tbody,
+.dark .results tr,
+.dark .results td,
+.dark .results th {
+  background: var(--card);
 }
 
-/* ===== DARK MODE LINK FIX ===== */
-.dark .result-file-link{
-  color:#7ab8ff;
+.dark .table tr {
+  background: var(--card);
 }
 
-/* ===== DARK MODE VIEW BUTTON ===== */
-.dark .view-btn{
-  color:#04233f !important;
+.dark .table tr:hover {
+  background: rgba(255,255,255,0.02);
 }
 
-/* Smooth theme transition */
-html, body, .card, .results, .fake-file {
-  transition:background-color 240ms ease,color 240ms ease,border-color 240ms ease;
+.dark .result-item {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  box-shadow: 0 6px 18px rgba(2,6,23,0.6);
 }
+
+.dark .fake-file {
+  border-style: dashed;
+  border-color: rgba(255,255,255,0.06);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background-color: rgba(255,255,255,0.15);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255,255,255,0.25);
+}
+
+/* smooth theme switch */
+html, body, .card, .fake-file, .results, .topbar {
+  transition: background-color 240ms ease, color 240ms ease, box-shadow 240ms ease, border-color 240ms ease;
+}
+give me full updated code
