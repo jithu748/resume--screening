@@ -2,6 +2,54 @@
 // Client JS with session-based upload support for privacy/security
 
 document.addEventListener('DOMContentLoaded', () => {
+  // ===== Dark Mode Toggle =====
+  const themeToggle = document.getElementById('themeToggle');
+  const iconSun = document.getElementById('iconSun');
+  const iconMoon = document.getElementById('iconMoon');
+  const htmlElement = document.documentElement;
+
+  // Initialize theme from localStorage or system preference
+  function initializeTheme() {
+    const savedTheme = localStorage.getItem('theme-preference');
+    let isDarkMode;
+
+    if (savedTheme) {
+      // Use saved preference
+      isDarkMode = savedTheme === 'dark';
+    } else {
+      // Use system preference
+      isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+
+    applyTheme(isDarkMode);
+  }
+
+  // Apply theme to DOM
+  function applyTheme(isDarkMode) {
+    if (isDarkMode) {
+      htmlElement.classList.add('dark');
+      iconSun?.style.setProperty('display', 'none');
+      iconMoon?.style.setProperty('display', 'block');
+    } else {
+      htmlElement.classList.remove('dark');
+      iconSun?.style.setProperty('display', 'block');
+      iconMoon?.style.setProperty('display', 'none');
+    }
+    // Persist preference
+    localStorage.setItem('theme-preference', isDarkMode ? 'dark' : 'light');
+  }
+
+  // Toggle theme
+  if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+      const isDarkMode = htmlElement.classList.contains('dark');
+      applyTheme(!isDarkMode);
+    });
+  }
+
+  // Initialize on load
+  initializeTheme();
+
   // Session storage for uploaded files
   let currentSessionId = null;
   let sessionStatusTimer = null;
