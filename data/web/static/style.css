@@ -106,7 +106,7 @@ label{font-size:0.92rem;color:var(--muted);margin-bottom:6px;font-weight:600}
 }
 .fake-file ol{margin:0;padding-left:18px}
 .fake-file li{margin:6px 0;font-size:0.95rem}
-.fake-file li strong{color:#0b4c86;margin-right:6px}
+.fake-file li strong{color:#0b4c86;margin-right:6px;display:none}
 
 /* drag visual */
 .droppable.over{border:2px dashed var(--accent);background:linear-gradient(90deg,rgba(11,120,209,0.05),rgba(11,120,209,0.02))}
