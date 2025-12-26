@@ -98,11 +98,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       const files = data.files || [];
-      const items = files.map((f, i) => `<li>${i + 1}. ${f}</li>`).join('');
+      const items = files.map((f) => `<li>${f}</li>`).join('');
       const ttl = typeof data.expires_in === 'number' ? Math.max(0, Math.floor(data.expires_in/60)) : null;
       const ttlMsg = ttl !== null ? ` (expires in ~${ttl} min)` : '';
-      resumeFake.innerHTML = `<div style="color: green;">✓ ${files.length} files uploaded${ttlMsg}</div>` +
-        `<ol style="margin:0;padding-left:20px;list-style:none">${items}</ol>`;
+      resumeFake.innerHTML = `<div style=\"color: green;\">✓ ${files.length} files uploaded${ttlMsg}</div>` +
+        `<ol style=\"margin:0;padding-left:20px\">${items}</ol>`;
     } catch (e) {
       resumeFake.innerHTML = '<em>Unable to load session status</em>';
     }
@@ -243,9 +243,9 @@ document.addEventListener('DOMContentLoaded', () => {
       fakeBox.innerHTML = '<em>No file selected</em>';
       return;
     }
-    const items = Array.from(input.files).map((f,i) =>
-      `<li><strong>${i+1}.</strong> ${f.name}</li>`).join('');
-    fakeBox.innerHTML = `<ol style="margin:0;padding-left:20px">${items}</ol>`;
+    const items = Array.from(input.files).map((f) =>
+      `<li>${f.name}</li>`).join('');
+    fakeBox.innerHTML = `<ol style=\"margin:0;padding-left:20px\">${items}</ol>`;
   }
 
   // File input handlers
@@ -295,7 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const count = data.count ?? files.length ?? 0;
           alert(`Uploaded ${count} files. Session ${currentSessionId.substring(0, 8)} created/updated.`);
           fileInput.value = '';
-          const items = files.map((f,i) => `<li><strong>${i+1}.</strong> ${f}</li>`).join('');
+          const items = files.map((f) => `<li>${f}</li>`).join('');
           resumeFake.innerHTML = `<div style=\"color: green;\">✓ ${count} files uploaded (session active)</div>` +
             `<ol style=\"margin:0;padding-left:20px\">${items}</ol>`;
           
