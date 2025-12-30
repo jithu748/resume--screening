@@ -331,6 +331,26 @@ def clear_uploads():
     }
 
 
+def _compute_job_title_relevance(job_title: str, cleaned_resumes: dict) -> dict:
+    """
+    Compute TF-IDF relevance of job_title against all resumes.
+    Returns: dict mapping resume filename to job_title relevance score (0-1).
+    """
+    if not job_title or not job_title.strip():
+        return {file: 1.0 for file in cleaned_resumes}  # If no job_title, all resumes are valid
+    
+    cleaned_job_title = clean_text(job_title)
+    vectors = get_tfidf_vectors(cleaned_job_title, cleaned_resumes)
+    cosine_scores = compute_cosine(vectors)
+    
+    # Map each resume to its job_title relevance score
+    relevance = {}
+    for idx, file in enumerate(cleaned_resumes.keys()):
+        relevance[file] = float(cosine_scores[idx] or 0.0)
+    
+    return relevance
+
+
 @app.post("/api/score")
 async def api_score(request: Request):
     """
@@ -340,6 +360,11 @@ async def api_score(request: Request):
     session_id is REQUIRED to identify which uploaded resumes to score.
     Returns: {"results": [{rank, file, score}, ...]}
     
+    MANDATORY VALIDATION:
+    - If job_title is provided, it MUST meet MINIMUM_SCORE_THRESHOLD
+    - Skills alone CANNOT override an irrelevant job_title
+    - Only when job_title is relevant OR job_title is empty → results can be returned
+    
     After scoring, the session files are automatically cleaned up.
     """
     try:
@@ -347,8 +372,8 @@ async def api_score(request: Request):
     except Exception:
         return JSONResponse({"error": "Invalid JSON payload"}, status_code=400)
 
-    job_title = payload.get("job_title", "")
-    skills = payload.get("skills", "")
+    job_title = payload.get("job_title", "").strip()
+    skills = payload.get("skills", "").strip()
     session_id = payload.get("session_id", "")
     
     try:
@@ -368,7 +393,7 @@ async def api_score(request: Request):
     resume_dir = _get_session_dir(session_id)
     _touch_session(session_id)
 
-    job_desc = f"{job_title} {skills}"
+    MINIMUM_SCORE_THRESHOLD = 0.05  # 5%
 
     try:
         # Load and process resumes
@@ -377,23 +402,59 @@ async def api_score(request: Request):
             return JSONResponse({"error": "No resumes found in session"}, status_code=400)
 
         cleaned_resumes = {f: clean_text(t) for f, t in resumes.items()}
+        
+        # Track which resumes passed job_title validation (for early filtering)
+        job_title_validated_files = None
 
+        # MANDATORY JOB TITLE VALIDATION
+        # If job_title is provided, validate it FIRST
+        # Skills alone CANNOT override an irrelevant job_title
+        if job_title:
+            job_title_relevance = _compute_job_title_relevance(job_title, cleaned_resumes)
+            
+            # Check if ANY resume meets the job_title threshold
+            valid_resumes = {file: score for file, score in job_title_relevance.items() 
+                           if score >= MINIMUM_SCORE_THRESHOLD}
+            
+            if not valid_resumes:
+                # Job title is irrelevant to ALL resumes - block all results
+                return {"results": []}
+            
+            # FIX: Don't set job_title_validated_files - let ALL resumes be scored on skills
+            # The job_title validation was just a check to ensure the search is relevant
+            # Now score ALL resumes on skills/TF-IDF, regardless of individual job_title match
+
+        # Now score with combined job_title + skills (or skills only if no job_title)
+        # Use ALL cleaned_resumes for TF-IDF vector space computation
+        job_desc = f"{job_title} {skills}".strip()
+        
         vectors = get_tfidf_vectors(clean_text(job_desc), cleaned_resumes)
         cosine_scores = compute_cosine(vectors)
 
         results = []
         for idx, (file, text) in enumerate(cleaned_resumes.items()):
+            # If job_title validation is active, skip resumes that didn't pass job_title check
+            if job_title_validated_files is not None and file not in job_title_validated_files:
+                continue
             try:
-                score_obj = score_resume(text, skills, float(cosine_scores[idx]))
+                # Use idx for cosine_scores since it corresponds to position in cleaned_resumes
+                score_obj = score_resume(text, skills, float(cosine_scores[idx] or 0.0))
                 if isinstance(score_obj, dict):
                     score_val = float(score_obj.get("score", 0.0))
                 else:
                     score_val = float(score_obj or 0.0)
-            except Exception:
+            except Exception as e:
                 score_val = float(cosine_scores[idx] or 0.0)
             results.append({"file": file, "score": score_val})
 
-        ranked = sorted(results, key=lambda x: x["score"], reverse=True)
+        # Filter out resumes with score below minimum threshold (5%)
+        filtered_results = [r for r in results if r["score"] >= MINIMUM_SCORE_THRESHOLD]
+
+        # If no results meet the threshold, return empty array
+        if not filtered_results:
+            return {"results": []}
+
+        ranked = sorted(filtered_results, key=lambda x: x["score"], reverse=True)
 
         # Return top_n
         out = []
@@ -418,13 +479,22 @@ async def run_and_score(
     """
     Backwards-compatible endpoint that accepts form data with file uploads.
     Creates a temporary session, processes files, scores them, and cleans up.
+    
+    MANDATORY VALIDATION:
+    - If job_title is provided, it MUST meet MINIMUM_SCORE_THRESHOLD
+    - Skills alone CANNOT override an irrelevant job_title
     """
+    job_title = (job_title or "").strip()
+    skills = (skills or "").strip()
+    
     if not job_title and not skills:
         return JSONResponse({"error": "Provide job_title or skills"}, status_code=400)
 
     # Create temporary session directory
     session_id = str(uuid.uuid4())
     temp_dir = tempfile.mkdtemp(prefix=f"resume_session_{session_id}_")
+    
+    MINIMUM_SCORE_THRESHOLD = 0.05  # 5%
     
     try:
         saved = []
@@ -461,30 +531,66 @@ async def run_and_score(
                 except Exception as e:
                     return JSONResponse({"error": f"Failed to extract {name}: {e}"}, status_code=500)
         
-        # Process resumes in the temp directory
-        job_desc = f"{job_title} {skills}"
+        # Load resumes
         resumes = load_resumes(resume_folder=temp_dir)
         
         if not resumes:
             return JSONResponse({"error": "No resumes found"}, status_code=400)
 
         cleaned_resumes = {f: clean_text(t) for f, t in resumes.items()}
+        
+        # Track which resumes passed job_title validation (for early filtering)
+        job_title_validated_files = None
+        
+        # MANDATORY JOB TITLE VALIDATION
+        # If job_title is provided, validate it FIRST
+        # Skills alone CANNOT override an irrelevant job_title
+        if job_title:
+            job_title_relevance = _compute_job_title_relevance(job_title, cleaned_resumes)
+            
+            # Check if ANY resume meets the job_title threshold
+            valid_resumes = {file: score for file, score in job_title_relevance.items() 
+                           if score >= MINIMUM_SCORE_THRESHOLD}
+            
+            if not valid_resumes:
+                # Job title is irrelevant to ALL resumes - block all results
+                return {"results": []}
+            
+            # FIX: Don't set job_title_validated_files - let ALL resumes be scored on skills
+            # The job_title validation was just a check to ensure the search is relevant
+            # Now score ALL resumes on skills/TF-IDF, regardless of individual job_title match
+        
+        # Now score with combined job_title + skills (or skills only if no job_title)
+        # Use ALL cleaned_resumes for TF-IDF vector space computation
+        job_desc = f"{job_title} {skills}".strip()
+        
         vectors = get_tfidf_vectors(clean_text(job_desc), cleaned_resumes)
         cosine_scores = compute_cosine(vectors)
 
         results = []
         for idx, (file, text) in enumerate(cleaned_resumes.items()):
+            # If job_title validation is active, skip resumes that didn't pass job_title check
+            if job_title_validated_files is not None and file not in job_title_validated_files:
+                continue
+            
             try:
-                score_obj = score_resume(text, skills, float(cosine_scores[idx]))
+                # Use idx for cosine_scores since it corresponds to position in cleaned_resumes
+                score_obj = score_resume(text, skills, float(cosine_scores[idx] or 0.0))
                 if isinstance(score_obj, dict):
                     score_val = float(score_obj.get("score", 0.0))
                 else:
                     score_val = float(score_obj or 0.0)
-            except Exception:
+            except Exception as e:
                 score_val = float(cosine_scores[idx] or 0.0)
             results.append({"file": file, "score": score_val})
 
-        ranked = sorted(results, key=lambda x: x["score"], reverse=True)
+        # Filter out resumes with score below minimum threshold (5%)
+        filtered_results = [r for r in results if r["score"] >= MINIMUM_SCORE_THRESHOLD]
+        
+        if not filtered_results:
+            return {"results": []}
+
+        ranked = sorted(filtered_results, key=lambda x: x["score"], reverse=True)
 
         out = []
         for i, rec in enumerate(ranked[:top_n], 1):
@@ -516,8 +622,15 @@ def download_results(
     Example:
       /api/download_results?job_title=Web%20Dev&skills=python,html&top_n=5&session_id=abc123
     
+    MANDATORY VALIDATION:
+    - If job_title is provided, it MUST meet MINIMUM_SCORE_THRESHOLD
+    - Skills alone CANNOT override an irrelevant job_title
+    
     Files are cleaned up after download.
     """
+    job_title = (job_title or "").strip()
+    skills = (skills or "").strip()
+    
     if not job_title and not skills:
         raise HTTPException(status_code=400, detail="Provide job_title or skills")
     
@@ -530,7 +643,7 @@ def download_results(
     resume_dir = _get_session_dir(session_id)
     _touch_session(session_id)
 
-    job_desc = f"{job_title} {skills}"
+    MINIMUM_SCORE_THRESHOLD = 0.05  # 5%
 
     try:
         resumes = load_resumes(resume_folder=resume_dir)
@@ -538,16 +651,71 @@ def download_results(
             raise HTTPException(status_code=400, detail="No resumes found")
 
         cleaned_resumes = {f: clean_text(t) for f, t in resumes.items()}
+        
+        # MANDATORY JOB TITLE VALIDATION
+        # If job_title is provided, validate it FIRST
+        # Skills alone CANNOT override an irrelevant job_title
+        if job_title:
+            job_title_relevance = _compute_job_title_relevance(job_title, cleaned_resumes)
+            
+            # Check if ANY resume meets the job_title threshold
+            valid_resumes = {file: score for file, score in job_title_relevance.items() 
+                           if score >= MINIMUM_SCORE_THRESHOLD}
+            
+            if not valid_resumes:
+                # Job title is irrelevant - return empty CSV with just header
+                import csv
+                from io import StringIO
+                
+                sio = StringIO()
+                writer = csv.writer(sio)
+                writer.writerow(["rank", "file", "score", "text"])
+                csv_bytes = sio.getvalue().encode("utf-8")
+                buf = io.BytesIO(csv_bytes)
+                buf.seek(0)
+                filename = "shortlisted.csv"
+                
+                return StreamingResponse(
+                    buf,
+                    media_type="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename={filename}"},
+                )
+            
+            # FIX: Don't set job_title_validated_files - let ALL resumes be scored on skills
+            # The job_title validation was just a check to ensure the search is relevant
+            # Now score ALL resumes on skills/TF-IDF, regardless of individual job_title match
+            job_title_validated_files = None
+        else:
+            job_title_validated_files = None
+        
+        # Now score with combined job_title + skills (or skills only if no job_title)
+        # Use ALL cleaned_resumes for TF-IDF vector space computation
+        job_desc = f"{job_title} {skills}".strip()
 
         vectors = get_tfidf_vectors(clean_text(job_desc), cleaned_resumes)
         cosine_scores = compute_cosine(vectors)
 
         results = []
         for idx, (file, text) in enumerate(cleaned_resumes.items()):
-            score = score_resume(text, skills, float(cosine_scores[idx]))
-            results.append({"file": file, "score": score})
+            # If job_title validation is active, skip resumes that didn't pass job_title check
+            if job_title_validated_files is not None and file not in job_title_validated_files:
+                continue
+            
+            try:
+                # Use idx for cosine_scores since it corresponds to position in cleaned_resumes
+                score = score_resume(text, skills, float(cosine_scores[idx] or 0.0))
+                if isinstance(score, dict):
+                    score_val = float(score.get("score", 0.0))
+                else:
+                    score_val = float(score or 0.0)
+            except Exception as e:
+                score_val = float(cosine_scores[idx] or 0.0)
+            results.append({"file": file, "score": score_val})
 
-        ranked = sorted(results, key=lambda x: x["score"], reverse=True)
+        # Filter out resumes with score below minimum threshold (5%)
+        filtered_results = [r for r in results if r["score"] >= MINIMUM_SCORE_THRESHOLD]
+        
+        ranked = sorted(filtered_results, key=lambda x: x["score"], reverse=True)
 
         # Build CSV rows
         import csv

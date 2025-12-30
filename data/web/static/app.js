@@ -110,11 +110,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // render results table (with View action)
   function renderResults(rows) {
-    resultsEl.innerHTML = '';
+    // HARD GUARD: Do nothing if rows is empty
     if (!rows || rows.length === 0) {
-      resultsEl.innerHTML = '<p class="muted">No matches found.</p>';
-      return;
+      resultsEl.innerHTML = '<p class="muted">No resumes found for the given job title or skills.</p>';
+      return; // HARD RETURN - no fallthrough
     }
+    
+    // ONLY execute table rendering if rows has valid data
+    resultsEl.innerHTML = '';
     const table = document.createElement('table');
     table.className = 'table';
     const thead = document.createElement('thead');
@@ -162,17 +165,23 @@ document.addEventListener('DOMContentLoaded', () => {
   // RUN button (calls /api/score with session_id)
   if (runBtn) {
     runBtn.addEventListener('click', async () => {
+      // ============== MANDATORY FIRST LINE: CLEAR ALL RESULTS ==============
+      resultsEl.innerHTML = '';
+      resultsEl.textContent = '';  // Double clear
+      
       const job_title = document.getElementById('job-title')?.value.trim() || '';
       const skills = document.getElementById('skills')?.value.trim() || '';
       const top_n = parseInt(document.getElementById('top-n')?.value || '5', 10) || 5;
       
       if (!skills && !job_title) {
         alert('Please add job title or skills');
+        resultsEl.innerHTML = '';  // Explicit clear before return
         return;
       }
 
       if (!currentSessionId) {
         alert('Please upload resumes first!');
+        resultsEl.innerHTML = '';  // Explicit clear before return
         return;
       }
 
@@ -191,10 +200,11 @@ document.addEventListener('DOMContentLoaded', () => {
             session_id: currentSessionId
           })
         });
+        
         const data = await resp.json();
+        
         if (!resp.ok) {
           resultsEl.innerHTML = `<p class="muted">Error: ${data.error || data.message || 'server'}</p>`;
-          // Session expired - clear it
           if (data.error && data.error.includes('session')) {
             currentSessionId = null;
             resumeFake.innerHTML = '<em>Session expired - please re-upload files</em>';
@@ -202,16 +212,54 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
         
-        // Success! Session remains active until TTL expiry (sliding)
+        // ============== SESSION REFRESH ==============
         await refreshServerList();
         
+        // ============== GET RESULTS FROM API ==============
         const rows = data.results ?? data.rows ?? [];
-        const normalized = rows.map(r => ({
-          file: r.file ?? r.filename ?? r.name,
-          score: r.score ?? (Array.isArray(r) ? r[1] : null),
-          usecase: r.usecase ?? 'For interview'
-        }));
-        renderResults(normalized);
+        
+        // ============== VALIDATION: Empty array check ==============
+        if (!Array.isArray(rows) || rows.length === 0) {
+          resultsEl.innerHTML = '<p class="muted">No resumes found for the given job title or skills.</p>';
+          return;
+        }
+        
+        // ============== NORMALIZE: Create new data objects ==============
+        const normalized = rows.map(r => {
+          return {
+            file: r.file ?? r.filename ?? r.name,
+            score: r.score ?? (Array.isArray(r) ? r[1] : null),
+            usecase: r.usecase ?? 'For interview'
+          };
+        });
+        
+        // ============== VALIDATION: Check if normalized is valid ==============
+        if (!Array.isArray(normalized) || normalized.length === 0) {
+          resultsEl.innerHTML = '<p class="muted">No resumes found for the given job title or skills.</p>';
+          return;
+        }
+        
+        // ============== FILTER: Keep ONLY score > 0.01 ==============
+        const validResults = normalized.filter(r => {
+          if (r === null || r === undefined) return false;
+          const scoreVal = typeof r.score === 'number' ? r.score : (parseFloat(r.score) || 0);
+          return scoreVal > 0.01;
+        });
+        
+        // ============== VALIDATION: Check filtered results ==============
+        if (!Array.isArray(validResults) || validResults.length === 0) {
+          resultsEl.innerHTML = '<p class="muted">No resumes found for the given job title or skills.</p>';
+          return;
+        }
+        
+        // ============== FINAL: RENDER ONLY IF ALL CHECKS PASS ==============
+        // Double-check valid results exist before rendering
+        if (validResults.length > 0) {
+          renderResults(validResults);
+        } else {
+          resultsEl.innerHTML = '<p class="muted">No resumes found for the given job title or skills.</p>';
+        }
+        
       } catch (err) {
         resultsEl.innerHTML = `<p class="muted">Error: ${err.message || err}</p>`;
         console.error(err);
