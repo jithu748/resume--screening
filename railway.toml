@@ -3,9 +3,7 @@ builder = "nixpacks"
 
 [deploy]
 startCommand = "python setup_nltk.py && uvicorn data.src.webapp:app --host 0.0.0.0 --port $PORT"
-restartPolicyMaxRetries = 5
 
 [env]
 PORT = "8000"
-NLTK_DATA = "/app/nltk_data"
 PYTHONUNBUFFERED = "1"
