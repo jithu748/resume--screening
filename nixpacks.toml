@@ -1,0 +1,19 @@
+[phases.setup]
+dependsOn = ["base"]
+
+[phases.install]
+dependsOn = ["setup"]
+# Skip any scripts that might auto-download NLTK during pip install
+cmds = [
+  "pip install --upgrade pip",
+  "pip install --no-cache-dir -r requirements.txt"
+]
+
+[phases.build]
+dependsOn = ["install"]
+# Don't run any build scripts that download data
+cmds = []
+
+[phases.start]
+# Download NLTK data at runtime, not during build
+cmd = "python setup_nltk.py && uvicorn data.src.webapp:app --host 0.0.0.0 --port $PORT"
