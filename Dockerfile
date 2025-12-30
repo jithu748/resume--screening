@@ -27,4 +27,5 @@ RUN mkdir -p data/resume_uploads 2>/dev/null || true
 EXPOSE 8000
 
 # Run application
-CMD ["uvicorn", "data.src.webapp:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn data.src.webapp:app --host 0.0.0.0 --port $PORT"]
+
