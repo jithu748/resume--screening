@@ -415,3 +415,56 @@ input[type="number"]:focus {
 .text-green {
   color: #22C55E !important;
 }
+
+/* --- Chips & Suggestions --- */
+.skills-block {
+  margin-top: 4px;
+  border-top: 1px solid #F3F4F6;
+  padding-top: 12px;
+}
+
+.pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.pill-header {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  min-width: 60px;
+}
+
+.skill-pill-match {
+  background: #D1FAE5;
+  color: #065F46;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #10B981;
+}
+
+.skill-pill-miss {
+  background: #FEE2E2;
+  color: #991B1B;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #EF4444;
+}
+
+.suggestion-box {
+  margin-top: 4px;
+  background: #FFFBEB;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  color: #92400E;
+  border: 1px solid #FCD34D;
+  line-height: 1.6;
+}

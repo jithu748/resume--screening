@@ -237,17 +237,52 @@ document.addEventListener('DOMContentLoaded', () => {
         textClass = "text-red";
       }
 
+      // Whitelist of common skills
+      const COMMON_SKILLS = new Set(["html", "css", "js", "javascript", "react", "node", "python", "java", "sql", "c++", "c#", "ruby", "php", "aws", "docker", "kubernetes", "git", "linux"]);
+
+      let suggestionBox = "";
+      if (rec.missing_skills && rec.missing_skills.length > 0) {
+        let suggestions = [];
+        rec.missing_skills.forEach(skill => {
+          if (COMMON_SKILLS.has(skill.toLowerCase())) {
+            suggestions.push(`Consider adding ${skill.toUpperCase()} projects or experience.`);
+          }
+        });
+        if (suggestions.length > 0) {
+          suggestionBox = `<div class="suggestion-box">💡 <strong>Suggestions:</strong><br>${suggestions.join('<br>')}</div>`;
+        }
+      }
+
+      let skillsHtml = "";
+      if (rec.matched_skills && rec.matched_skills.length > 0) {
+        skillsHtml += `<div class="pill-group"><span class="pill-header">Matched:</span>`;
+        rec.matched_skills.forEach(s => skillsHtml += `<span class="skill-pill-match">✔ ${s}</span>`);
+        skillsHtml += `</div>`;
+      }
+      if (rec.missing_skills && rec.missing_skills.length > 0) {
+        skillsHtml += `<div class="pill-group"><span class="pill-header">Missing:</span>`;
+        rec.missing_skills.forEach(s => skillsHtml += `<span class="skill-pill-miss">❌ ${s}</span>`);
+        skillsHtml += `</div>`;
+      }
+      if (skillsHtml) {
+        skillsHtml = `<div class="skills-block">${skillsHtml}</div>`;
+      }
+
       const card = document.createElement('div');
       card.className = 'result-card';
       card.innerHTML = `
-        <div class="score-circle ${colorClass}" style="border: 2px solid;">
-          ${displayPct}%
+        <div class="card-top">
+          <div class="score-circle ${colorClass}" style="border: 2px solid;">
+            ${displayPct}%
+          </div>
+          <div class="result-info">
+            <h3 class="candidate-name">${cleanName}</h3>
+            <p class="candidate-skills ${textClass}" style="font-weight: 500;">${suggestion}</p>
+          </div>
+          <button class="view-btn">View</button>
         </div>
-        <div class="result-info">
-          <h3 class="candidate-name">${cleanName}</h3>
-          <p class="candidate-skills ${textClass}" style="font-weight: 500;">${suggestion}</p>
-        </div>
-        <button class="view-btn">View</button>
+        ${skillsHtml}
+        ${suggestionBox}
       `;
 
       card.querySelector('.view-btn').addEventListener('click', () => {

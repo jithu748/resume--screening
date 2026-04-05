@@ -439,13 +439,19 @@ async def api_score(request: Request):
             try:
                 # Use idx for cosine_scores since it corresponds to position in cleaned_resumes
                 score_obj = score_resume(text, skills, float(cosine_scores[idx] or 0.0))
+                matched_skills = []
+                missing_skills = []
                 if isinstance(score_obj, dict):
                     score_val = float(score_obj.get("score", 0.0))
+                    matched_skills = score_obj.get("matched_skills", [])
+                    missing_skills = score_obj.get("missing_skills", [])
                 else:
                     score_val = float(score_obj or 0.0)
             except Exception as e:
                 score_val = float(cosine_scores[idx] or 0.0)
-            results.append({"file": file, "score": score_val})
+                matched_skills = []
+                missing_skills = []
+            results.append({"file": file, "score": score_val, "matched_skills": matched_skills, "missing_skills": missing_skills})
 
         # Filter out resumes with score below minimum threshold (5%)
         filtered_results = [r for r in results if r["score"] >= MINIMUM_SCORE_THRESHOLD]
@@ -459,7 +465,7 @@ async def api_score(request: Request):
         # Return top_n
         out = []
         for i, rec in enumerate(ranked[:top_n], 1):
-            out.append({"rank": i, "file": rec["file"], "score": rec["score"]})
+            out.append({"rank": i, "file": rec["file"], "score": rec["score"], "matched_skills": rec.get("matched_skills", []), "missing_skills": rec.get("missing_skills", [])})
 
         return {"results": out}
     
@@ -576,13 +582,19 @@ async def run_and_score(
             try:
                 # Use idx for cosine_scores since it corresponds to position in cleaned_resumes
                 score_obj = score_resume(text, skills, float(cosine_scores[idx] or 0.0))
+                matched_skills = []
+                missing_skills = []
                 if isinstance(score_obj, dict):
                     score_val = float(score_obj.get("score", 0.0))
+                    matched_skills = score_obj.get("matched_skills", [])
+                    missing_skills = score_obj.get("missing_skills", [])
                 else:
                     score_val = float(score_obj or 0.0)
             except Exception as e:
                 score_val = float(cosine_scores[idx] or 0.0)
-            results.append({"file": file, "score": score_val})
+                matched_skills = []
+                missing_skills = []
+            results.append({"file": file, "score": score_val, "matched_skills": matched_skills, "missing_skills": missing_skills})
 
         # Filter out resumes with score below minimum threshold (5%)
         filtered_results = [r for r in results if r["score"] >= MINIMUM_SCORE_THRESHOLD]
@@ -594,7 +606,7 @@ async def run_and_score(
 
         out = []
         for i, rec in enumerate(ranked[:top_n], 1):
-            out.append({"rank": i, "file": rec["file"], "score": rec["score"]})
+            out.append({"rank": i, "file": rec["file"], "score": rec["score"], "matched_skills": rec.get("matched_skills", []), "missing_skills": rec.get("missing_skills", [])})
 
         return {"results": out}
     

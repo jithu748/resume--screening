@@ -5,7 +5,7 @@ import os
 from typing import Optional
 
 def score_resume(resume_text: str, job_skills: str, similarity_score: float,
-                 verbose: bool = True, log_csv: Optional[str] = None) -> float:
+                 verbose: bool = True, log_csv: Optional[str] = None) -> dict:
     """
     Score a resume and optionally print debug info and append a row to a CSV file.
 
@@ -69,4 +69,8 @@ def score_resume(resume_text: str, job_skills: str, similarity_score: float,
             if verbose:
                 print(f"[WARN] Failed to write debug CSV: {e}")
 
-    return round(final_score, 3)
+    return {
+        "score": round(final_score, 3),
+        "matched_skills": found_skills,
+        "missing_skills": sorted(list(required_skills_set - set(found_skills)))
+    }
