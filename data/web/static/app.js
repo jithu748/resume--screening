@@ -1,397 +1,269 @@
 // data/web/static/app.js
-// Client JS with session-based upload support for privacy/security
+// Modern Mobile-Friendly UI Control Logic - Refactored for Separate Upload Flows
 
 document.addEventListener('DOMContentLoaded', () => {
-  // ===== Dark Mode Toggle =====
-  const themeToggle = document.getElementById('themeToggle');
-  const iconLabel = document.getElementById('iconLabel');
-  const htmlElement = document.documentElement;
 
-  // Initialize theme from localStorage or system preference
-  function initializeTheme() {
-    const savedTheme = localStorage.getItem('theme-preference');
-    let isDarkMode;
+  // File Inputs
+  const fileInputResumes = document.getElementById('file_input_resumes');
+  const fileInputZip = document.getElementById('file_input_zip');
 
-    if (savedTheme) {
-      // Use saved preference
-      isDarkMode = savedTheme === 'dark';
-    } else {
-      // Use system preference
-      isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
+  // File Summaries
+  const fileSummaryResumes = document.getElementById('file-summary-resumes');
+  const fileCountTextResumes = document.getElementById('file-count-resumes');
+  const clearResumesBtn = document.getElementById('clear-resumes-btn');
 
-    applyTheme(isDarkMode);
-  }
+  const fileSummaryZip = document.getElementById('file-summary-zip');
+  const fileCountTextZip = document.getElementById('file-count-zip');
+  const clearZipBtn = document.getElementById('clear-zip-btn');
 
-  // Apply theme to DOM
-  function applyTheme(isDarkMode) {
-    if (isDarkMode) {
-      htmlElement.classList.add('dark');
-      if (iconLabel) iconLabel.textContent = '☀️';
-    } else {
-      htmlElement.classList.remove('dark');
-      if (iconLabel) iconLabel.textContent = '🌙';
-    }
-    // Persist preference
-    localStorage.setItem('theme-preference', isDarkMode ? 'dark' : 'light');
-  }
+  const analyzeBtn = document.getElementById('analyzeBtn');
 
-  // Toggle theme
-  if (themeToggle) {
-    themeToggle.addEventListener('click', () => {
-      const isDarkMode = htmlElement.classList.contains('dark');
-      applyTheme(!isDarkMode);
-    });
-  }
+  // States
+  const loadingState = document.getElementById('loading-state');
+  const loadingMessage = document.getElementById('loading-message');
+  const resultsContainer = document.getElementById('results-container');
+  const resultsList = document.getElementById('results-list');
 
-  // Initialize on load
-  initializeTheme();
-
-  // Session storage for uploaded files
   let currentSessionId = null;
-  let sessionStatusTimer = null;
 
-  // Elements (matching IDs from the template)
-  const runBtn = document.getElementById('runBtn');
-  const resetBtn = document.getElementById('resetBtn');
-  const resultsEl = document.getElementById('results');
+  // --- UI feedback: Toast Notifications ---
+  function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('show'));
+    setTimeout(() => {
+      toast.classList.remove('show');
+      toast.addEventListener('transitionend', () => toast.remove());
+    }, 3500);
+  }
 
-  const fileInput = document.getElementById('file_input');
-  const resumeFake = document.getElementById('resume-fake');
-  const browseBtn = document.getElementById('browseBtn');
-  const clearBtn = document.getElementById('clearBtn');
-  const inlineUploadBtn = document.getElementById('inlineUploadBtn');
+  // --- Dynamic Loading Messages ---
+  let loadInterval;
+  function startLoadingAnimations(isMultiple) {
+    loadingState.classList.remove('hidden');
+    resultsContainer.classList.add('hidden');
+    analyzeBtn.disabled = true;
 
+    // Customize messages based on single/multiple
+    const messages = isMultiple
+      ? ["Uploading batch archive...", "Extracting multiple files...", "Analyzing all resumes...", "Matching skills...", "Ranking candidates..."]
+      : ["Uploading document...", "Reading document text...", "Analyzing keywords...", "Generating score..."];
 
+    let i = 0;
+    loadingMessage.textContent = messages[0];
 
-  const zipInput = document.getElementById('zip_input');
-  const zipFake = document.getElementById('zip-fake');
-  const zipBrowse = document.getElementById('zipBrowse');
-  const zipClear = document.getElementById('zipClear');
+    loadInterval = setInterval(() => {
+      i = (i + 1) % messages.length;
+      loadingMessage.textContent = messages[i];
+    }, 1500);
+  }
 
-  // helper to format percent-like scores (keeps old behavior)
-  function formatScore(s) {
-    if (s === null || s === undefined) return '-';
-    if (typeof s === 'string') return s;
-    if (typeof s === 'number' && isFinite(s)) {
-      if (s >= 0 && s <= 1) return (s * 100).toFixed(2) + '%';
-      if (s > 1 && s <= 100) return s.toFixed(2) + '%';
-      return s.toFixed(3);
+  function stopLoadingAnimations() {
+    loadingState.classList.add('hidden');
+    clearInterval(loadInterval);
+    analyzeBtn.disabled = false;
+  }
+
+  // --- Update File Selection UI and Validation ---
+
+  fileInputResumes.addEventListener('change', () => {
+    if (fileInputResumes.files && fileInputResumes.files.length > 0) {
+      fileCountTextResumes.textContent = fileInputResumes.files.length;
+      fileSummaryResumes.classList.remove('hidden');
+
+      // Auto-clear the other input to prevent mix-ups natively
+      if (fileInputZip.files.length > 0) {
+        fileInputZip.value = '';
+        fileSummaryZip.classList.add('hidden');
+        showToast("Switched to individual resume upload", "info");
+      }
+    } else {
+      fileSummaryResumes.classList.add('hidden');
     }
-    return String(s);
-  }
-
-  // ---- refreshServerList: update resume list display (session state kept in memory) ----
-  async function refreshServerList() {
-    // Session info is no longer displayed in UI, but currentSessionId is maintained
-    // for API calls. This function is minimal now but kept for extensibility.
-    if (!currentSessionId) {
-      resumeFake.innerHTML = '<em>No file selected</em>';
-      return;
-    }
-    try {
-      const r = await fetch(`/api/session_status?session_id=${encodeURIComponent(currentSessionId)}`);
-      const data = await r.json();
-      if (!r.ok) {
-        resumeFake.innerHTML = '<em>Session expired - please re-upload files</em>';
-        currentSessionId = null;
-        return;
-      }
-      const files = data.files || [];
-      const items = files.map((f) => `<li>${f}</li>`).join('');
-      const ttl = typeof data.expires_in === 'number' ? Math.max(0, Math.floor(data.expires_in/60)) : null;
-      const ttlMsg = ttl !== null ? ` (expires in ~${ttl} min)` : '';
-      resumeFake.innerHTML = `<div style=\"color: green;\">✓ ${files.length} files uploaded${ttlMsg}</div>` +
-        `<ol style=\"margin:0;padding-left:20px\">${items}</ol>`;
-    } catch (e) {
-      resumeFake.innerHTML = '<em>Unable to load session status</em>';
-    }
-  }
-
-  // render results table (with View action)
-  function renderResults(rows) {
-    // HARD GUARD: Do nothing if rows is empty
-    if (!rows || rows.length === 0) {
-      resultsEl.innerHTML = '<p class="muted">No resumes found for the given job title or skills.</p>';
-      return; // HARD RETURN - no fallthrough
-    }
-    
-    // ONLY execute table rendering if rows has valid data
-    resultsEl.innerHTML = '';
-    const table = document.createElement('table');
-    table.className = 'table';
-    const thead = document.createElement('thead');
-    thead.innerHTML = '<tr><th>Use-case</th><th>File</th><th>Score</th><th>Action</th></tr>';
-    table.appendChild(thead);
-    const tbody = document.createElement('tbody');
-    rows.forEach(r => {
-      const tr = document.createElement('tr');
-      const useTd = document.createElement('td');
-      useTd.textContent = r.usecase || 'For interview';
-      const fileTd = document.createElement('td');
-      fileTd.textContent = r.file || r.filename || '—';
-      const scoreTd = document.createElement('td');
-      scoreTd.className = 'score';
-      const s = (typeof r.score === 'number' || typeof r.score === 'string') ? r.score : (r.score && r.score.value) || r.score;
-      scoreTd.textContent = formatScore(s);
-      
-      // Add View button
-      const actionTd = document.createElement('td');
-      const viewBtn = document.createElement('button');
-      viewBtn.className = 'btn ghost small';
-      viewBtn.textContent = 'View';
-      viewBtn.style.padding = '6px 12px';
-      viewBtn.style.fontSize = '0.85rem';
-      const filename = r.file || r.filename;
-      if (filename && currentSessionId) {
-        viewBtn.addEventListener('click', () => {
-          window.open(`/view/${encodeURIComponent(currentSessionId)}/${encodeURIComponent(filename)}`, '_blank');
-        });
-      } else {
-        viewBtn.disabled = true;
-      }
-      actionTd.appendChild(viewBtn);
-      
-      tr.appendChild(useTd);
-      tr.appendChild(fileTd);
-      tr.appendChild(scoreTd);
-      tr.appendChild(actionTd);
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    resultsEl.appendChild(table);
-  }
-
-  // RUN button (calls /api/score with session_id)
-  if (runBtn) {
-    runBtn.addEventListener('click', async () => {
-      // ============== MANDATORY FIRST LINE: CLEAR ALL RESULTS ==============
-      resultsEl.innerHTML = '';
-      resultsEl.textContent = '';  // Double clear
-      
-      const job_title = document.getElementById('job-title')?.value.trim() || '';
-      const skills = document.getElementById('skills')?.value.trim() || '';
-      const top_n = parseInt(document.getElementById('top-n')?.value || '5', 10) || 5;
-      
-      if (!skills && !job_title) {
-        alert('Please add job title or skills');
-        resultsEl.innerHTML = '';  // Explicit clear before return
-        return;
-      }
-
-      if (!currentSessionId) {
-        alert('Please upload resumes first!');
-        resultsEl.innerHTML = '';  // Explicit clear before return
-        return;
-      }
-
-      runBtn.disabled = true;
-      runBtn.textContent = 'Running…';
-      resultsEl.innerHTML = '<p class="muted">Running... please wait.</p>';
-      
-      try {
-        const resp = await fetch('/api/score', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            job_title,
-            skills,
-            top_n,
-            session_id: currentSessionId
-          })
-        });
-        
-        const data = await resp.json();
-        
-        if (!resp.ok) {
-          resultsEl.innerHTML = `<p class="muted">Error: ${data.error || data.message || 'server'}</p>`;
-          if (data.error && data.error.includes('session')) {
-            currentSessionId = null;
-            resumeFake.innerHTML = '<em>Session expired - please re-upload files</em>';
-          }
-          return;
-        }
-        
-        // ============== SESSION REFRESH ==============
-        await refreshServerList();
-        
-        // ============== GET RESULTS FROM API ==============
-        const rows = data.results ?? data.rows ?? [];
-        
-        // ============== VALIDATION: Empty array check ==============
-        if (!Array.isArray(rows) || rows.length === 0) {
-          resultsEl.innerHTML = '<p class="muted">No resumes found for the given job title or skills.</p>';
-          return;
-        }
-        
-        // ============== NORMALIZE: Create new data objects ==============
-        const normalized = rows.map(r => {
-          return {
-            file: r.file ?? r.filename ?? r.name,
-            score: r.score ?? (Array.isArray(r) ? r[1] : null),
-            usecase: r.usecase ?? 'For interview'
-          };
-        });
-        
-        // ============== VALIDATION: Check if normalized is valid ==============
-        if (!Array.isArray(normalized) || normalized.length === 0) {
-          resultsEl.innerHTML = '<p class="muted">No resumes found for the given job title or skills.</p>';
-          return;
-        }
-        
-        // ============== FILTER: Keep ONLY score > 0.01 ==============
-        const validResults = normalized.filter(r => {
-          if (r === null || r === undefined) return false;
-          const scoreVal = typeof r.score === 'number' ? r.score : (parseFloat(r.score) || 0);
-          return scoreVal > 0.01;
-        });
-        
-        // ============== VALIDATION: Check filtered results ==============
-        if (!Array.isArray(validResults) || validResults.length === 0) {
-          resultsEl.innerHTML = '<p class="muted">No resumes found for the given job title or skills.</p>';
-          return;
-        }
-        
-        // ============== FINAL: RENDER ONLY IF ALL CHECKS PASS ==============
-        // Double-check valid results exist before rendering
-        if (validResults.length > 0) {
-          renderResults(validResults);
-        } else {
-          resultsEl.innerHTML = '<p class="muted">No resumes found for the given job title or skills.</p>';
-        }
-        
-      } catch (err) {
-        resultsEl.innerHTML = `<p class="muted">Error: ${err.message || err}</p>`;
-        console.error(err);
-      } finally {
-        runBtn.disabled = false;
-        runBtn.textContent = 'Run';
-      }
-    });
-  }
-
-  // Reset button (clear form UI and session)
-  if (resetBtn) {
-    resetBtn.addEventListener('click', () => {
-      document.getElementById('job-title').value = '';
-      document.getElementById('skills').value = '';
-      document.getElementById('top-n').value = 5;
-      fileInput.value = '';
-      zipInput.value = '';
-      resultsEl.innerHTML = '';
-      currentSessionId = null;
-      resumeFake.innerHTML = '<em>No file selected</em>';
-      zipFake.innerHTML = '<em>No file selected</em>';
-    });
-  }
-
-  // Show filenames (numbered) in fake box
-  function showFilesList(input, fakeBox) {
-    if (!input.files || input.files.length === 0) {
-      fakeBox.innerHTML = '<em>No file selected</em>';
-      return;
-    }
-    const items = Array.from(input.files).map((f) =>
-      `<li>${f.name}</li>`).join('');
-    fakeBox.innerHTML = `<ol style=\"margin:0;padding-left:20px\">${items}</ol>`;
-  }
-
-  // File input handlers
-  if (fileInput) {
-    browseBtn?.addEventListener('click', () => fileInput.click());
-    clearBtn?.addEventListener('click', () => {
-      fileInput.value = '';
-      showFilesList(fileInput, resumeFake);
-    });
-    fileInput.addEventListener('change', () => {
-      showFilesList(fileInput, resumeFake);
-      // show inline upload button (if present)
-      const inlineUpload = document.getElementById('inline-upload');
-      if (inlineUpload) inlineUpload.removeAttribute('aria-hidden');
-    });
-  }
-
-  // Inline upload handler (uploads files and stores session_id)
-  if (inlineUploadBtn) {
-    inlineUploadBtn.addEventListener('click', async () => {
-      if (!fileInput.files || fileInput.files.length === 0) {
-        alert('No files selected');
-        return;
-      }
-      
-      const form = new FormData();
-      for (let i = 0; i < fileInput.files.length; i++) {
-        form.append('files', fileInput.files[i]);
-      }
-      if (currentSessionId) {
-        form.append('session_id', currentSessionId);
-      }
-      
-      inlineUploadBtn.disabled = true;
-      inlineUploadBtn.textContent = 'Uploading…';
-      
-      try {
-        const resp = await fetch('/api/upload', { method: 'POST', body: form });
-        const data = await resp.json().catch(() => ({}));
-        
-        if (!resp.ok) {
-          alert('Upload failed: ' + (data?.error || data?.message || 'server'));
-        } else {
-          // Store/refresh session ID and render list of uploaded files
-          currentSessionId = data.session_id;
-          const files = data.files ?? data.saved ?? [];
-          const count = data.count ?? files.length ?? 0;
-          alert(`Uploaded ${count} files. Session ${currentSessionId.substring(0, 8)} created/updated.`);
-          fileInput.value = '';
-          const items = files.map((f) => `<li>${f}</li>`).join('');
-          resumeFake.innerHTML = `<div style=\"color: green;\">✓ ${count} files uploaded (session active)</div>` +
-            `<ol style=\"margin:0;padding-left:20px\">${items}</ol>`;
-          
-          // Hide inline upload button
-          const inline = document.getElementById('inline-upload');
-          if (inline) inline.setAttribute('aria-hidden', 'true');
-        }
-      } catch (err) {
-        alert('Upload error: ' + err.message);
-      } finally {
-        inlineUploadBtn.disabled = false;
-        inlineUploadBtn.textContent = 'Upload';
-      }
-    });
-  }
-
-  // ZIP controls
-  if (zipInput) {
-    zipBrowse?.addEventListener('click', () => zipInput.click());
-    zipClear?.addEventListener('click', () => {
-      zipInput.value = '';
-      zipFake.innerHTML = '<em>No file selected</em>';
-    });
-    zipInput.addEventListener('change', () => showFilesList(zipInput, zipFake));
-  }
-
-  // Drag & drop UX for wrapper elements
-  ['resume-wrapper','zip-wrapper'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('over'); });
-    el.addEventListener('dragleave', e => { el.classList.remove('over'); });
-    el.addEventListener('drop', e => {
-      e.preventDefault(); el.classList.remove('over');
-      const files = e.dataTransfer.files;
-      if (!files || !files.length) return;
-      if (id === 'resume-wrapper') {
-        fileInput.files = files;
-        showFilesList(fileInput, resumeFake);
-        const inline = document.getElementById('inline-upload'); if (inline) inline.removeAttribute('aria-hidden');
-      } else {
-        zipInput.files = files;
-        showFilesList(zipInput, zipFake);
-      }
-    });
   });
 
-  // On load, show initial empty state
-  refreshServerList();
+  fileInputZip.addEventListener('change', () => {
+    if (fileInputZip.files && fileInputZip.files.length > 0) {
+      fileCountTextZip.textContent = fileInputZip.files.length;
+      fileSummaryZip.classList.remove('hidden');
+
+      // Auto-clear the other input to prevent mix-ups natively
+      if (fileInputResumes.files.length > 0) {
+        fileInputResumes.value = '';
+        fileSummaryResumes.classList.add('hidden');
+        showToast("Switched to ZIP batch upload", "info");
+      }
+    } else {
+      fileSummaryZip.classList.add('hidden');
+    }
+  });
+
+  // Clear Buttons
+  clearResumesBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    fileInputResumes.value = '';
+    fileSummaryResumes.classList.add('hidden');
+  });
+
+  clearZipBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    fileInputZip.value = '';
+    fileSummaryZip.classList.add('hidden');
+  });
+
+  // --- Main Analyze Flow ---
+  analyzeBtn.addEventListener('click', async () => {
+    const jobTitle = document.getElementById('job-title').value.trim();
+    const skills = document.getElementById('skills').value.trim();
+    const topN = parseInt(document.getElementById('top-n').value) || 5;
+
+    if (!jobTitle && !skills) {
+      showToast('Please enter a Target Role or Skills', 'error');
+      return;
+    }
+
+    const hasResumes = fileInputResumes.files && fileInputResumes.files.length > 0;
+    const hasZip = fileInputZip.files && fileInputZip.files.length > 0;
+
+    // Validation Rules
+    if (!hasResumes && !hasZip) {
+      showToast('Error: Please select either a Resume or a ZIP file to proceed.', 'error');
+      return;
+    }
+
+    if (hasResumes && hasZip) {
+      showToast('Conflict: Please upload EITHER individual resumes OR a ZIP file, not both.', 'error');
+      return;
+    }
+
+    const isMultiple = hasZip || (hasResumes && fileInputResumes.files.length > 1);
+    startLoadingAnimations(isMultiple);
+
+    try {
+      // Step 1: Upload Files
+      const formData = new FormData();
+      let uploadEndpoint = '';
+
+      if (hasZip) {
+        uploadEndpoint = '/api/upload-zip';
+        formData.append('file', fileInputZip.files[0]);
+      } else {
+        uploadEndpoint = '/api/upload';
+        for (let i = 0; i < fileInputResumes.files.length; i++) {
+          formData.append('files', fileInputResumes.files[i]);
+        }
+      }
+
+      const uploadRes = await fetch(uploadEndpoint, { method: 'POST', body: formData });
+      const uploadData = await uploadRes.json();
+
+      if (!uploadRes.ok) throw new Error(uploadData.error || 'Upload failed');
+
+      currentSessionId = uploadData.session_id;
+
+      // Step 2: Score Resumes
+      const scoreRes = await fetch('/api/score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          job_title: jobTitle,
+          skills: skills,
+          top_n: topN,
+          session_id: currentSessionId
+        })
+      });
+
+      const scoreData = await scoreRes.json();
+
+      if (!scoreRes.ok) throw new Error(scoreData.error || 'Scoring failed');
+
+      // Step 3: Render Results
+      renderResults(scoreData.results || [], skills);
+
+    } catch (err) {
+      showToast(err.message, 'error');
+      stopLoadingAnimations();
+    }
+  });
+
+  // --- Render Result Cards ---
+  function renderResults(records, targetSkills) {
+    stopLoadingAnimations();
+    resultsList.innerHTML = '';
+
+    if (records.length === 0) {
+      showToast('No matching resumes found.', 'info');
+      // Show empty state inside results
+      resultsList.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 20px;">No exact matches met the minimum threshold.</p>';
+      resultsContainer.classList.remove('hidden');
+      return;
+    }
+
+    records.forEach((rec, index) => {
+      // Explicit float handling / 100 normalization
+      let displayPct = 0;
+      let rawScore = parseFloat(rec.score) || 0;
+
+      if (rawScore <= 1.0 && rawScore > 0) {
+        displayPct = Math.round(rawScore * 100);
+      } else {
+        displayPct = Math.round(rawScore);
+      }
+      displayPct = Math.max(0, Math.min(100, displayPct)); // Clamp 0-100
+
+      // Cleanup filename for display
+      const filename = rec.file || rec.filename || 'Unknown';
+      let cleanName = filename.replace(/\.(pdf|docx)$/i, '').replace(/_/g, ' ');
+
+      // Subtitle suggestion helper based on score
+      let suggestion = "Review Details";
+      let colorClass = "score-yellow";
+      let textClass = "text-yellow";
+
+      if (displayPct >= 71) {
+        suggestion = "Strong Match";
+        colorClass = "score-green";
+        textClass = "text-green";
+      } else if (displayPct >= 41) {
+        suggestion = "Potential Match";
+        colorClass = "score-yellow";
+        textClass = "text-yellow";
+      } else {
+        suggestion = "Low Relevance";
+        colorClass = "score-red";
+        textClass = "text-red";
+      }
+
+      const card = document.createElement('div');
+      card.className = 'result-card';
+      card.innerHTML = `
+        <div class="score-circle ${colorClass}" style="border: 2px solid;">
+          ${displayPct}%
+        </div>
+        <div class="result-info">
+          <h3 class="candidate-name">${cleanName}</h3>
+          <p class="candidate-skills ${textClass}" style="font-weight: 500;">${suggestion}</p>
+        </div>
+        <button class="view-btn">View</button>
+      `;
+
+      card.querySelector('.view-btn').addEventListener('click', () => {
+        window.open(`/view/${encodeURIComponent(currentSessionId)}/${encodeURIComponent(filename)}`, '_blank');
+      });
+
+      resultsList.appendChild(card);
+    });
+
+    resultsContainer.classList.remove('hidden');
+
+    // Smooth scroll down to results
+    setTimeout(() => {
+      resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      showToast('Analysis successfully completed!', 'success');
+    }, 100);
+  }
 
 });

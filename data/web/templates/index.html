@@ -1,151 +1,130 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Resume Screening</title>
-
-  <!-- your stylesheet -->
-<link rel="stylesheet" href="/static/style.css?v=100">
-
-  <style>
-    .muted-small { font-size:0.85rem; color:var(--muted); margin-top:6px; }
-    /* Dark mode toggle button - highly visible */
-    .theme-toggle {
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      gap:6px;
-      border-radius:8px;
-      padding:10px 14px;
-      cursor:pointer;
-      background:rgba(255,255,255,0.15);
-      border: 1px solid rgba(255,255,255,0.25);
-      color: #fff;
-      font-size: 20px;
-      font-weight: bold;
-      transition: all 200ms ease;
-      min-width: 44px;
-      min-height: 44px;
-    }
-    .theme-toggle:hover {
-      background:rgba(255,255,255,0.25);
-      border-color:rgba(255,255,255,0.35);
-      transform: scale(1.08);
-    }
-    .theme-toggle:active {
-      transform: scale(0.95);
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+  <title>AI Resume Screener</title>
+  <link rel="stylesheet" href="/static/style.css?v=300">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body>
-  <header class="topbar">
-    <div class="container" style="display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <h1>Resume Screening</h1>
-        <div class="muted">Fast TF-IDF matching • CSV/Excel exports • Shortlist & archive</div>
-      </div>
 
-      <!-- Dark mode toggle -->
-      <div>
-        <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode" type="button">
-          <span id="iconLabel">🌙</span>
-        </button>
-      </div>
+<body>
+
+  <!-- Top App Bar -->
+  <header class="app-bar">
+    <div class="app-title">
+      <svg class="app-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10 9 9 9 8 9"></polyline>
+      </svg>
+      <h1>AI Resume Screener</h1>
     </div>
   </header>
 
-  <main class="container">
-    <div class="card" role="main" aria-labelledby="screening-title">
-      <section class="form-area" aria-labelledby="screening-title">
-        <h2 id="screening-title">Find Candidates</h2>
+  <!-- Main Mobile Container -->
+  <main class="app-container">
 
-        <!-- Upload multiple resumes (top) -->
-        <div class="row">
-          <label for="file_input">Upload resumes (.pdf, .docx)</label>
+    <!-- Configuration Card -->
+    <div class="card">
+      <h2 class="card-title">Job Requirements</h2>
 
-          <div class="file-wrapper droppable" id="resume-wrapper" style="align-items:flex-start;">
-            <div class="fake-file" id="resume-fake" aria-live="polite">
-              <em>No file selected</em>
-            </div>
+      <div class="input-group">
+        <label for="job-title">Target Role</label>
+        <input id="job-title" type="text" placeholder="e.g. Frontend Developer" />
+      </div>
 
-            <!-- hidden input (multiple allowed) -->
-            <input id="file_input" class="file-input-hidden" type="file" multiple accept=".pdf,.docx" />
+      <div class="input-group">
+        <label for="skills">Key Skills (comma separated)</label>
+        <input id="skills" type="text" placeholder="e.g. React, JavaScript, CSS" />
+      </div>
 
-            <!-- inline controls (visible; placed near the fake box) -->
-            <div class="file-controls">
-              <button type="button" id="browseBtn" class="file-btn browse">Browse</button>
-              <button type="button" id="clearBtn" class="file-btn clear">Clear</button>
-            </div>
-
-            <!-- inline upload button shown only when files selected -->
-            <div class="inline-upload" id="inline-upload" aria-hidden="true">
-              <button id="inlineUploadBtn" class="btn primary small">Upload</button>
-            </div>
-          </div>
-
-          <div class="muted-small">You can select multiple resumes (Ctrl / Shift) or drag & drop files here.</div>
-        </div>
-
-        <!-- Upload ZIP (clean) -->
-        <div class="row">
-          <label for="zip_input">Or upload a ZIP (many resumes)</label>
-          <div class="file-wrapper droppable" id="zip-wrapper">
-            <div class="fake-file" id="zip-fake">No file selected</div>
-
-            <!-- hidden zip input -->
-            <input id="zip_input" class="file-input-hidden" type="file" accept=".zip" />
-
-            <div class="file-controls">
-              <button type="button" id="zipBrowse" class="file-btn browse">Browse</button>
-              <button type="button" id="zipClear" class="file-btn clear">Clear</button>
-            </div>
-          </div>
-          <div class="muted-small">Upload a ZIP file when you want to screen many resumes at once.</div>
-        </div>
-
-        <!-- Job title -->
-        <div class="row">
-          <label for="job-title">Job title</label>
-          <input id="job-title" class="input" name="job_title" type="text" placeholder="e.g. Senior Backend Engineer" />
-        </div>
-
-        <!-- Skills -->
-        <div class="row">
-          <label for="skills">Skills (comma separated)</label>
-          <input id="skills" class="input" name="skills" type="text" placeholder="e.g. python,django,sql" />
-          <div class="muted-small">Use commas to separate multiple skills.</div>
-        </div>
-
-        <!-- Top results -->
-        <div class="row small">
-          <label for="top-n">Top results</label>
-          <input id="top-n" class="input" name="top_n" type="number" min="1" max="50" value="5">
-        </div>
-
-        <!-- Action buttons -->
-        <div class="row actions" style="margin-top:12px">
-          <button id="runBtn" class="btn primary fullwidth" type="button">Run</button>
-          <button id="resetBtn" class="btn ghost fullwidth" type="button">Clear</button>
-        </div>
-
-        <div class="hint muted">Tip: add job title and 2–4 core skills for best results.</div>
-      </section>
-
-      <aside class="results-area">
-        <h2>Results</h2>
-        <div id="results" class="results">
-          <div class="muted">No results yet — run the screening to see matches.</div>
-        </div>
-      </aside>
+      <div class="input-group">
+        <label for="top-n">Top results to show</label>
+        <input id="top-n" type="number" min="1" max="50" value="5" />
+      </div>
     </div>
 
-    <div class="footer">
-      <p class="muted">Run the server with: <code>uvicorn data.src.webapp:app --reload</code></p>
+    <!-- Upload Options Box -->
+    <div class="card">
+      <h2 class="card-title">Upload Candidates</h2>
+      <p class="subtitle" style="margin-bottom: 24px;">Please choose ONE upload method below.</p>
+
+      <!-- Option A: Single/Multiple Files -->
+      <div class="upload-section">
+        <label class="upload-section-title">Option A: Upload Individual Resumes</label>
+        <div class="upload-zone" id="upload-zone-files">
+          <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+            <polyline points="13 2 13 9 20 9"></polyline>
+          </svg>
+          <span class="upload-text">Select Resumes (PDF / DOCX)</span>
+          <input type="file" id="file_input_resumes" multiple accept=".pdf,.docx" class="hidden-input" />
+        </div>
+        <div id="file-summary-resumes" class="file-summary hidden">
+          <div class="file-badge"><span id="file-count-resumes">0</span> document(s)</div>
+          <button id="clear-resumes-btn" class="btn-text small" style="margin-left: 8px;">Clear</button>
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <div class="divider">
+        <span>OR</span>
+      </div>
+
+      <!-- Option B: ZIP Archive -->
+      <div class="upload-section">
+        <label class="upload-section-title">Option B: Upload ZIP Archive</label>
+        <div class="upload-zone" id="upload-zone-zip">
+          <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>
+            <path
+              d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z">
+            </path>
+          </svg>
+          <span class="upload-text">Select ZIP</span>
+          <input type="file" id="file_input_zip" accept=".zip" class="hidden-input" />
+        </div>
+        <div id="file-summary-zip" class="file-summary hidden">
+          <div class="file-badge"><span id="file-count-zip">0</span> zip file</div>
+          <button id="clear-zip-btn" class="btn-text small" style="margin-left: 8px;">Clear</button>
+        </div>
+      </div>
+
     </div>
+
+    <!-- Fixed Action Area (Bottom) -->
+    <div class="action-area">
+      <button id="analyzeBtn" class="btn-primary">
+        Analyze Resumes
+      </button>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading-state" class="loading-state hidden">
+      <div class="spinner"></div>
+      <p id="loading-message" class="loading-message">Initializing...</p>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results-container" class="results-container hidden">
+      <div class="results-header">
+        <h2>Report</h2>
+      </div>
+      <div id="results-list" class="results-list">
+        <!-- Result cards injected here via JS -->
+      </div>
+    </div>
+
   </main>
 
-  <!-- main app logic -->
- <script src="/static/app.js?v=100"></script>
+  <!-- Toast Notifications Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="/static/app.js?v=300"></script>
 </body>
+
 </html>
