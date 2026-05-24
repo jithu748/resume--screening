@@ -42,16 +42,28 @@ def test_upload_and_score():
     assert 'results' in results, "No results returned!"
     print(f"✓ Got {len(results['results'])} results")
     
-    # 3. Try to score again with same session_id (should fail - auto-cleanup)
-    print("\nTrying to re-use session_id (should fail)...")
+    # 3. Try to score again with same session_id (should succeed - sliding TTL)
+    print("\nTrying to re-use session_id (should succeed due to TTL)...")
     resp = requests.post(f"{BASE_URL}/api/score", json=score_payload)
     data = resp.json()
     print(f"Second score response: {resp.status_code}")
-    print(f"Response: {data}")
+    assert resp.status_code == 200, "Should have succeeded with 200!"
+    print("✓ Session correctly kept alive for further operations (View/Download)")
+
+    # 4. End session manually
+    print("\nEnding session manually...")
+    resp = requests.delete(f"{BASE_URL}/api/session?session_id={session_id}")
+    print(f"End session response: {resp.status_code}")
+    
+    # 5. Try to score again after ending (should fail)
+    print("\nTrying to re-use session_id after ending it (should fail)...")
+    resp = requests.post(f"{BASE_URL}/api/score", json=score_payload)
+    data = resp.json()
+    print(f"Third score response: {resp.status_code}")
     
     assert resp.status_code == 400, "Should have failed with 400!"
-    assert 'expired' in data.get('error', '').lower(), "Should mention expired session!"
-    print("✓ Session correctly expired after use")
+    assert 'expired' in data.get('error', '').lower() or 'invalid' in data.get('error', '').lower(), "Should mention expired/invalid session!"
+    print("✓ Session correctly ended and files are inaccessible")
 
 
 def test_user_isolation():
