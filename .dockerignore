@@ -20,4 +20,17 @@ env/
 .pytest_cache/
 htmlcov/
 .coverage
+
+# Secrets and environment files
 .env
+.env.*
+!.env.example
+
+# Uploaded resumes and generated results
+data/resumes/
+data/resume_uploads/
+data/shortlisted/
+data/out/
+
+# Local test output
+test_out.txt
