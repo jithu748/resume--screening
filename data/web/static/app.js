@@ -3,6 +3,27 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
+  function getCookie(name) {
+    const prefix = `${name}=`;
+    const cookie = document.cookie.split('; ').find(value => value.startsWith(prefix));
+    return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null;
+  }
+
+  async function apiFetch(url, options = {}) {
+    const request = { ...options, credentials: 'include', headers: { ...(options.headers || {}) } };
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes((request.method || 'GET').toUpperCase())) {
+      const csrf = getCookie('resume_csrf');
+      if (csrf && !request.headers['X-CSRF-Token']) request.headers['X-CSRF-Token'] = csrf;
+    }
+    const response = await fetch(url, request);
+    if (response.status === 401) {
+      setAuthState(null, 'Please sign in to continue.');
+      throw new Error('Please sign in to continue.');
+    }
+    if (response.status === 403) throw new Error('Not authorized or request expired.');
+    return response;
+  }
+
   // File Inputs
   const fileInputResumes = document.getElementById('file_input_resumes');
   const fileInputZip = document.getElementById('file_input_zip');
@@ -25,6 +46,62 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsList = document.getElementById('results-list');
 
   let currentSessionId = null;
+  const authStatus = document.getElementById('auth-status');
+  const logoutBtn = document.getElementById('logout-btn');
+
+  function setAuthState(user, message) {
+    const identity = user && (user.email || user.user);
+    if (authStatus) authStatus.textContent = message || (user ? `Signed in as ${identity} (${user.role})` : 'Anonymous development mode');
+    if (logoutBtn) logoutBtn.classList.toggle('hidden', !user);
+  }
+
+  async function loadCurrentUser() {
+    try {
+      const response = await fetch('/api/auth/me', { credentials: 'include' });
+      if (response.ok) setAuthState(await response.json());
+      else setAuthState(null, 'Anonymous development mode');
+    } catch (_) {
+      setAuthState(null, 'Unable to check sign-in status.');
+    }
+  }
+
+  async function submitAuth(endpoint, body) {
+    const response = await apiFetch(endpoint, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || data.error || 'Authentication request failed');
+    setAuthState(data);
+    showToast('Authentication successful', 'success');
+  }
+
+  document.getElementById('login-btn').addEventListener('click', async () => {
+    try {
+      await submitAuth('/api/auth/login', {
+        email: document.getElementById('auth-email').value,
+        password: document.getElementById('auth-password').value
+      });
+    } catch (err) { showToast(err.message, 'error'); }
+  });
+
+  document.getElementById('register-btn').addEventListener('click', async () => {
+    try {
+      await submitAuth('/api/auth/register', {
+        email: document.getElementById('auth-email').value,
+        password: document.getElementById('auth-password').value,
+        agency_name: document.getElementById('auth-agency').value
+      });
+    } catch (err) { showToast(err.message, 'error'); }
+  });
+
+  logoutBtn.addEventListener('click', async () => {
+    try {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+      setAuthState(null, 'Signed out. Anonymous development mode remains available when enabled.');
+    } catch (err) { showToast(err.message, 'error'); }
+  });
+
+  loadCurrentUser();
 
   // --- UI feedback: Toast Notifications ---
   function showToast(message, type = 'info') {
@@ -157,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
-      const uploadRes = await fetch(uploadEndpoint, { method: 'POST', body: formData });
+      const uploadRes = await apiFetch(uploadEndpoint, { method: 'POST', body: formData });
       const uploadData = await uploadRes.json();
 
       if (!uploadRes.ok) throw new Error(uploadData.error || 'Upload failed');
@@ -165,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
       currentSessionId = uploadData.session_id;
 
       // Step 2: Score Resumes
-      const scoreRes = await fetch('/api/score', {
+      const scoreRes = await apiFetch('/api/score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -48,3 +48,7 @@ out/
 .DS_Store
 Thumbs.db
 test_out.txt
+
+# Local authentication database
+*.sqlite3
+*.sqlite3-journal

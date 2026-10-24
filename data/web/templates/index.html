@@ -28,6 +28,27 @@
   <!-- Main Mobile Container -->
   <main class="app-container">
 
+    <!-- Authentication remains optional in explicitly configured development mode. -->
+    <div class="card" id="auth-card">
+      <h2 class="card-title">Agency account</h2>
+      <p id="auth-status" class="subtitle">Checking sign-in status...</p>
+      <div class="input-group">
+        <label for="auth-email">Email</label>
+        <input id="auth-email" type="email" autocomplete="email" />
+      </div>
+      <div class="input-group">
+        <label for="auth-password">Password</label>
+        <input id="auth-password" type="password" autocomplete="current-password" />
+      </div>
+      <div class="input-group">
+        <label for="auth-agency">New agency name (for registration)</label>
+        <input id="auth-agency" type="text" autocomplete="organization" />
+      </div>
+      <button id="login-btn" class="btn-primary" type="button">Sign in</button>
+      <button id="register-btn" class="btn-text" type="button">Create agency account</button>
+      <button id="logout-btn" class="btn-text hidden" type="button">Sign out</button>
+    </div>
+
     <!-- Configuration Card -->
     <div class="card">
       <h2 class="card-title">Job Requirements</h2>
@@ -124,7 +145,7 @@
   <!-- Toast Notifications Container -->
   <div id="toast-container" class="toast-container"></div>
 
-  <script src="/static/app.js?v=300"></script>
+  <script src="/static/app.js?v=301"></script>
 </body>
 
 </html>
