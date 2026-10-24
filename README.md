@@ -1,194 +1,451 @@
-Resume Screening — Full (from-scratch) Guide and Interview Notes
+# Resume Screening System
 
-This README now contains a complete "from-scratch" explanation you can use to understand the project end-to-end, run it locally, and explain it in interviews. It covers setup, run commands, internals, tradeoffs, and suggested next steps.
+**Live Demo:** [https://resume-screening-14.onrender.com](https://resume-screening-14.onrender.com)
 
-Table of contents
-- From scratch setup (step-by-step)
-- Quick run examples
-- Detailed code walkthrough (file-by-file)
-- How scoring works (exact flow)
-- Exports and automation options (CSV/XLSX, copy, zip)
-- Limitations, tradeoffs and scaling
-- Troubleshooting common errors
-- Interview cheat-sheet (ready-to-speak bullets + 1-minute pitch)
-- Next steps you can implement
+An automated resume-screening application that extracts text from PDF and DOCX resumes, compares candidates against job requirements using TF-IDF and cosine similarity, and ranks resumes using similarity scores and skill matching.
 
-## From-scratch setup (Windows PowerShell)
+The project includes a web interface, bulk resume uploads, ZIP import, a Python command-line interface, and CSV/Excel export options.
 
-Prerequisites
-- Python 3.10+ installed and available in PATH. If not installed, get it from https://www.python.org/downloads/
-- Git (optional) to clone the repo.
+> **Demo note:** The live application is hosted on Render's free instance, which may take around 50 seconds or longer to respond after inactivity. Use synthetic or non-sensitive sample resumes when testing a public demo. Do not upload confidential candidate information unless the deployment's privacy and data-retention practices have been verified.
 
-Step 1 — Clone and inspect repo
-```powershell
-cd C:\path\where\you\keep\projects
-git clone <repo-url> resume_screening
-cd "d:\projects\resume_screening"
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Technology Stack](#technology-stack)
+- [How It Works](#how-it-works)
+- [Project Structure](#project-structure)
+- [Run Locally](#run-locally)
+- [Run the Web Application](#run-the-web-application)
+- [Command-Line Usage](#command-line-usage)
+- [Exports and Bulk Processing](#exports-and-bulk-processing)
+- [Scoring Method](#scoring-method)
+- [Security and Deployment](#security-and-deployment)
+- [Limitations](#limitations)
+- [Troubleshooting](#troubleshooting)
+- [Future Improvements](#future-improvements)
+- [Interview Explanation](#interview-explanation)
+
+---
+
+## Features
+
+- **Resume text extraction:** Extract text from PDF and DOCX files.
+- **Job requirement matching:** Compare resume content with job titles, descriptions, and required skills.
+- **Automated ranking:** Rank resumes according to calculated matching scores.
+- **Bulk uploads:** Upload multiple supported resumes.
+- **ZIP import:** Upload an archive containing multiple resumes.
+- **Web interface:** Interact with the screening workflow through a browser.
+- **Command-line interface:** Run screening jobs from a terminal or automation script.
+- **CSV export:** Export screening results for further analysis.
+- **Excel export:** Generate XLSX reports when the optional Excel dependency is installed.
+- **Shortlist management:** Copy selected top-ranked resumes into an output directory.
+- **ZIP output:** Package shortlisted resumes for convenient transfer.
+- **Modular design:** Keep extraction, preprocessing, vectorization, scoring, and output handling separate.
+
+## Technology Stack
+
+| Component | Technologies |
+|---|---|
+| Programming language | Python |
+| Web framework | FastAPI |
+| Frontend | HTML, CSS, JavaScript |
+| Text extraction | pdfminer.six, python-docx |
+| Text preprocessing | NLTK |
+| Text vectorization | TF-IDF, scikit-learn |
+| Similarity calculation | Cosine similarity |
+| Data export | CSV, optional XLSX |
+| Database and authentication | PostgreSQL and authentication components in the security-enabled branch |
+| Hosting | Render |
+
+The exact dependencies are defined in the project's requirements files.
+
+---
+
+## How It Works
+
+The application follows a resume-screening pipeline:
+
+1. **Input job requirements:** Enter a job title and relevant skills or requirements.
+2. **Upload resumes:** Select individual PDF/DOCX files, multiple files, or a ZIP archive.
+3. **Extract text:** Read text from supported documents.
+4. **Preprocess text:** Normalize text, remove unwanted characters, and tokenize where applicable.
+5. **Vectorize text:** Convert the job requirements and resume content into TF-IDF vectors.
+6. **Calculate similarity:** Calculate cosine similarity between the job vector and each resume vector.
+7. **Apply skill matching:** Evaluate required skills and combine skill matching with the similarity score according to the scoring implementation.
+8. **Rank candidates:** Sort candidates by their calculated scores.
+9. **Export results:** Download or generate supported reports and shortlist outputs.
+
+The system is designed to assist recruiters with initial screening. Its scores should not be treated as definitive judgments about a candidate's qualifications.
+
+---
+
+## Project Structure
+
+The repository contains the following major components. Exact paths may vary by branch.
+
+```text
+resume_screening/
+├── main.py
+├── data/
+│   ├── requirements.txt
+│   ├── src/
+│   │   ├── main.py
+│   │   ├── webapp.py
+│   │   ├── extract_text.py
+│   │   ├── preprocess.py
+│   │   ├── vectorizer.py
+│   │   ├── similarity.py
+│   │   └── scorer.py
+│   ├── web/
+│   │   ├── static/
+│   │   └── templates/
+│   └── resume_uploads/
+├── tests/
+├── AUTHENTICATION.md
+├── .env.example
+├── .gitignore
+└── README.md
 ```
 
-Step 2 — Create & activate a virtual environment
+### Main Components
+
+- `main.py`: Project-level command-line launcher.
+- `data/src/main.py`: Processes CLI arguments, loads resumes, runs screening, and handles outputs.
+- `data/src/webapp.py`: FastAPI web application and API endpoints.
+- `data/src/extract_text.py`: Extracts text from PDF and DOCX documents.
+- `data/src/preprocess.py`: Cleans and normalizes text.
+- `data/src/vectorizer.py`: Creates TF-IDF vectors.
+- `data/src/similarity.py`: Calculates cosine similarity.
+- `data/src/scorer.py`: Applies similarity and skill-matching logic.
+- `data/web/`: Contains the web frontend.
+- `tests/`: Contains automated tests.
+- `AUTHENTICATION.md`: Documents authentication and development configuration.
+
+---
+
+## Run Locally
+
+### Prerequisites
+
+Install the following:
+
+- Python 3.10 or a compatible version supported by the project's dependencies.
+- Git.
+- A terminal such as PowerShell, Command Prompt, or Bash.
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/jithu748/resume--screening.git
+cd resume--screening
+```
+
+### 2. Create a virtual environment
+
+**Windows PowerShell**
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-Step 3 — Upgrade pip and install dependencies
-```powershell
-D:/projects/resume_screening/.venv/Scripts/python.exe -m pip install --upgrade pip
-D:/projects/resume_screening/.venv/Scripts/python.exe -m pip install -r data/requirements.txt
-# Optional for Excel output
-D:/projects/resume_screening/.venv/Scripts/python.exe -m pip install openpyxl
+**Linux/macOS**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-Step 4 — (one-time) download NLTK data
-```powershell
-D:/projects/resume_screening/.venv/Scripts/python.exe -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet'); nltk.download('omw-1.4')"
+### 3. Install dependencies
+
+From the project root, install the dependencies specified by the repository:
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install -r data/requirements.txt
 ```
 
-Step 5 — Put your resumes in `data/resume_uploads/`
-- Supported: `.pdf` and `.docx`.
-- If you have scanned PDFs (image-only), run OCR first (Tesseract) to produce a text PDF or convert to `.docx`.
+If Excel output is optional and not already included in the installed dependencies:
 
-Step 6 — Run the app
-- Interactive (prompts):
-```powershell
-D:/projects/resume_screening/.venv/Scripts/python.exe main.py
-```
-- Non-interactive (recommended for automation):
-```powershell
-D:/projects/resume_screening/.venv/Scripts/python.exe main.py --job-title "Web Developer" --skills "python,html,css" --top 5
+```bash
+python -m pip install openpyxl
 ```
 
-## Quick run examples (copyable)
+Install any additional web or database dependencies required by the selected application configuration and documented in the repository.
 
-- Print top 5 matches:
-```powershell
-D:/projects/resume_screening/.venv/Scripts/python.exe main.py --job-title "Web Developer" --skills "python,html,css" --top 5
+### 4. Download NLTK resources
+
+If the preprocessing pipeline requires these NLTK resources, download them once:
+
+```bash
+python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet'); nltk.download('omw-1.4')"
 ```
 
-- Export CSV and copy top-3 resumes into `out/shortlisted` and zip them:
-```powershell
-D:/projects/resume_screening/.venv/Scripts/python.exe main.py --job-title "Web Dev" --skills "python,html" --top 3 --output-csv out/results.csv --copy-top-dir out/shortlisted --zip
+### 5. Start the command-line application
+
+```bash
+python main.py
 ```
 
-- Include full extracted text in CSV (can be large):
-```powershell
-D:/projects/resume_screening/.venv/Scripts/python.exe main.py --job-title "Data Scientist" --skills "python,pandas" --include-text --output-csv out/results_with_text.csv
-```
-
-## Web UI & Bulk import
-
-You can run a simple web interface (FastAPI + static frontend) that allows:
-- Running the same TF-IDF scoring from your browser
-- Uploading single or multiple resume files (.pdf/.docx)
-- Uploading a single ZIP archive containing hundreds of resumes (server extracts them into `data/resume_uploads`)
-
-Run the webapp (from project root):
-
-```powershell
-# activate venv first
-.\.venv\Scripts\Activate.ps1
-# install web deps if needed
-.\.venv\Scripts\python.exe -m pip install fastapi uvicorn python-multipart
-# start the server
-D:/projects/resume_screening/.venv/Scripts/python.exe -m uvicorn data.src.webapp:app --reload
-```
-
-Using the UI:
-- Open http://127.0.0.1:8000/ in your browser.
-- Use the "Upload ZIP" button to upload a single .zip that contains many resumes (the server will extract .pdf and .docx files automatically into `data/resume_uploads/`).
-- Or use the file chooser to select multiple files at once and click "Upload".
-
-Local bulk import (fast copy of many files)
-- If you already have a local folder with many resumes, you can run the helper script to copy them into the project folder:
-
-```powershell
-D:/projects/resume_screening/.venv/Scripts/python.exe scripts/import_folder.py "C:\path\to\resumes"
-```
-
-This script copies only `.pdf` and `.docx` files and is efficient for moving hundreds of files into the app.
-
-
-## Detailed code walkthrough (file-by-file)
-
-- `main.py` (project root): small launcher that ensures `data/src` is on `sys.path` and runs the CLI-enabled script.
-- `data/src/main.py`: the orchestrator. Responsibilities:
-  - Parse CLI args (argparse).
-  - Load resumes from `--resume-dir` (default `data/resume_uploads`).
-  - Preprocess, vectorize and compute similarity.
-  - Score resumes using `scorer.py` logic.
-  - Print and optionally export results (CSV/XLSX), copy resumes, zip outputs.
-- `data/src/extract_text.py`: text extraction functions. Key points:
-  - Uses `pdfminer.six` to extract text from regular PDFs.
-  - Uses `python-docx` (`from docx import Document`) to read `.docx`.
-  - `load_resumes(resume_folder)` returns a dict mapping filename -> extracted text.
-- `data/src/preprocess.py`: cleaning utilities. Typical tasks:
-  - Lowercasing, punctuation removal, normalization.
-  - Tokenization and stopword removal (NLTK).
-  - (Optional) lemmatization or stemming.
-- `data/src/vectorizer.py`: builds TF-IDF with sklearn. The code fits TF-IDF on [job_desc] + resumes and returns a matrix.
-- `data/src/similarity.py`: computes cosine similarity. It compares job vector vs resume vectors and returns scores.
-- `data/src/scorer.py`: applies business rules combining similarity and explicit skill checks.
-
-## How scoring works (flow)
-
-1. Job description (job title + skills string) is cleaned and converted to a TF-IDF vector.
-2. Each resume is cleaned and converted to TF-IDF vectors using the same vocabulary.
-3. Cosine similarity between the job vector and each resume vector is computed.
-4. `scorer.py` adjusts the raw similarity by checking presence of required skills (simple substring checks or token matches). Final score is a weighted combination.
-
-You can open `data/src/scorer.py` to see exact weights and matching strategy — this is the main place to adjust how much skills vs semantic match matter.
-
-## Exports and automation options
-
-- `--output-csv PATH` — writes ranked results to CSV. If `--include-text` is given, CSV includes a `text` column.
-- `--output-xlsx PATH` — writes Excel output (requires `openpyxl`).
-- `--copy-top-dir PATH` — copies top-N resumes to the provided directory; filenames are prefixed with the score.
-- `--zip` — creates a zip of the copied directory (use together with `--copy-top-dir`).
-- `--output-dir DIR` — base directory to resolve relative output paths (useful for CI).
-
-All outputs create missing directories automatically.
-
-## Limitations, tradeoffs and scaling (talking points)
-
-- TF-IDF (current approach):
-  - Pros: cheap, explainable, sparse; good baseline for structured resume text.
-  - Cons: limited semantic understanding; fails on paraphrased or implicit matches.
-- Preprocessing and extraction are brittle across resume formats — inconsistent layouts reduce extraction quality.
-- Memory: TF-IDF keeps sparse matrices in memory. For thousands of resumes, consider precomputing and storing vectors or using an index.
-
-## Troubleshooting — common errors and fixes
-
-- ModuleNotFoundError: make sure you activated the venv and installed `requirements.txt`.
-  - Example: `D:/projects/resume_screening/.venv/Scripts/python.exe -m pip install -r data/requirements.txt`
-- `No /Root object! - Is this really a PDF?` — `pdfminer` failed; the PDF might be corrupted or scanned. Use OCR (Tesseract) to extract text first.
-- Empty results or low scores — check `data/resume_uploads` contains valid `.pdf`/`.docx` and that `load_resumes()` returns non-empty strings.
-- Excel export fails: install `openpyxl` in the venv.
-
-## Interview cheat-sheet ( ready-to-speak bullets )
-
-Use these concise points when asked about the project:
-
-- "I built a modular resume-screening tool that extracts text from PDF/DOCX, preprocesses it, vectorizes using TF-IDF, and ranks resumes by cosine similarity combined with explicit skill matching."
-- "Design: separate concerns — extraction, preprocessing, vectorization, scoring, and output; this makes testing and replacement of components straightforward."
-- "Why TF-IDF: quick baseline, interpretable, sparse (memory efficient), easy to compute and tune."
-- "Scaling plan: precompute and persist resume vectors, or move to semantic embeddings and an ANN index (FAISS) for large-scale matching."
-- "Error handling: handle invalid PDFs gracefully, create output directories automatically, and provide CSV/XLSX exports and zipped shortlisted resumes for downstream workflows."
-- "Next steps: add multiprocessing for IO-heavy text extraction, persist vectors with joblib for repeated queries, add a tiny REST API for non-CLI usage."
-
-One-minute pitch (template):
-
-"I built an automated resume-screening prototype that reads PDF and Word resumes, normalizes and vectorizes their text with TF-IDF, and ranks candidates by cosine similarity combined with explicit skill checks. It's modular, supports CLI automation and exporting results (CSV/Excel), and can be scaled to thousands of resumes by persisting vectors or switching to dense embeddings with an ANN index."
-
-## Next steps (what we can implement quickly)
-
-If you want, I can implement any of these next items — tell me which and I'll add it to the todo list and start:
-
-1. Persist resume vectors to disk (joblib) so queries are fast after indexing.
-2. Parallelize text extraction with multiprocessing to handle large batches.
-3. Add a small FastAPI service to accept a job description and return ranked candidates (useful for an internal dashboard).
-4. Produce a one-page printable interview cheat-sheet (bullet points only).
+For the web interface, follow the next section.
 
 ---
 
-If you'd like, I will now add the one-page interview cheat-sheet as a separate file `INTERVIEW.md` and/or implement vector persistence (option 1). Which should I do next?
+## Run the Web Application
+
+From the project root, activate your virtual environment and install the web dependencies if necessary:
+
+```bash
+python -m pip install fastapi uvicorn python-multipart
+```
+
+Start the FastAPI application:
+
+```bash
+python -m uvicorn data.src.webapp:app --reload
+```
+
+Open the local application:
+
+[http://127.0.0.1:8000/](http://127.0.0.1:8000/)
+
+The `--reload` option is intended for local development.
+
+### Using the web interface
+
+1. Open the application.
+2. Enter the job title and required skills.
+3. Select PDF/DOCX resumes or upload a supported ZIP archive.
+4. Run the screening operation.
+5. Review the ranking and matching scores.
+6. Export the results if the relevant export option is available.
+
+### Authentication and configuration
+
+The security-enabled application supports production authentication and PostgreSQL configuration. Follow [`AUTHENTICATION.md`](AUTHENTICATION.md) and `.env.example` for the required settings.
+
+Do not copy local development settings into a public production service. Production authentication, database configuration, explicit trusted CORS origins, and secure upload handling must remain enabled as required by the application.
+
+---
+
+## Command-Line Usage
+
+Run the interactive CLI:
+
+```bash
+python main.py
+```
+
+Run a non-interactive screening job:
+
+```bash
+python main.py --job-title "Web Developer" --skills "python,html,css" --top 5
+```
+
+Print the top five candidates for a web-development role.
+
+### Export results
+
+Export CSV results:
+
+```bash
+python main.py --job-title "Data Scientist" --skills "python,pandas" --output-csv out/results.csv
+```
+
+Export full extracted text with the results:
+
+```bash
+python main.py --job-title "Data Scientist" --skills "python,pandas" --include-text --output-csv out/results_with_text.csv
+```
+
+Be careful when exporting full resume text because it may contain personal information.
+
+### Shortlist and ZIP output
+
+Copy the top three candidates into a shortlist directory and package the directory:
+
+```bash
+python main.py --job-title "Web Developer" --skills "python,html" --top 3 --copy-top-dir out/shortlisted --zip
+```
+
+The exact supported options depend on the CLI implementation in the selected branch. Run `python main.py --help` to inspect available arguments.
+
+---
+
+## Exports and Bulk Processing
+
+Depending on the configured workflow, the application supports:
+
+| Option | Purpose |
+|---|---|
+| `--output-csv PATH` | Write screening results to CSV |
+| `--output-xlsx PATH` | Write screening results to Excel |
+| `--include-text` | Include extracted resume text in exports |
+| `--copy-top-dir PATH` | Copy the top-ranked resumes into a directory |
+| `--zip` | Create an archive of the shortlisted files |
+| `--output-dir DIR` | Set a base output directory where supported |
+
+For bulk screening, use the ZIP upload feature or provide multiple supported files through the web interface.
+
+Only upload files you are authorized to process. Check archive contents and avoid placing sensitive candidate information in publicly accessible output directories.
+
+---
+
+## Scoring Method
+
+The documented baseline uses TF-IDF and cosine similarity, combined with explicit skill matching.
+
+### TF-IDF
+
+Term Frequency–Inverse Document Frequency represents how important a word is to a document relative to the document collection. It provides a lightweight way to represent job requirements and resume text numerically.
+
+### Cosine Similarity
+
+Cosine similarity compares the direction of two vectors and produces a similarity measure. In this project, it is used to compare the job-requirement vector with each resume vector.
+
+### Skill Matching
+
+The scoring component checks for required skills using the matching rules implemented in `data/src/scorer.py`. The final score combines similarity and skill-related signals according to that implementation.
+
+### Important limitations of scoring
+
+- Keyword matches do not guarantee actual proficiency.
+- Different wording can cause relevant experience to be missed.
+- Resume formatting and extraction quality can affect scores.
+- TF-IDF is not a full semantic understanding system.
+- A high score is not proof that a candidate is the best person for a job.
+
+Use ranking as a decision-support tool. Human review should remain part of the recruitment process.
+
+---
+
+## Security and Deployment
+
+The application has a security-enabled development branch with authentication, PostgreSQL integration, upload validation, and related tests.
+
+**Live demo:** [https://resume-screening-14.onrender.com](https://resume-screening-14.onrender.com)
+
+### Deployment notes
+
+- The live demo is hosted on Render.
+- Free instances may spin down after inactivity and take time to respond.
+- The current live deployment may not contain every change from the latest feature branch.
+- Production configuration must be verified before enabling new authentication or database migrations.
+- A PostgreSQL backup should be verified before applying a production schema migration.
+- Keep credentials in private environment configuration, never in source code or README files.
+- Do not enable local demo mode in production.
+- Keep upload validation, authentication, CSRF protections, origin validation, and session isolation intact.
+
+For the security-enabled configuration, see [`AUTHENTICATION.md`](AUTHENTICATION.md).
+
+---
+
+## Limitations
+
+- **Text extraction:** Scanned or image-only PDFs may require OCR before processing.
+- **Formatting:** Multi-column resumes, unusual layouts, tables, and complex designs may reduce extraction quality.
+- **Semantic matching:** TF-IDF can miss meaning when a resume describes skills differently from the job description.
+- **Scale:** Large batches can increase processing time and memory usage.
+- **Scoring:** Simple skill checks may not capture context, depth, or recency of experience.
+- **Production readiness:** Database connectivity, migrations, environment configuration, storage persistence, and backup/restore behavior must be verified for the target deployment.
+
+---
+
+## Troubleshooting
+
+### `ModuleNotFoundError`
+
+Activate the correct virtual environment and install the project dependencies:
+
+```bash
+python -m pip install -r data/requirements.txt
+```
+
+### The web server does not start
+
+Check that the virtual environment is activated and the required packages are installed. Run the Uvicorn command from the project root.
+
+### PDF extraction fails
+
+The PDF may be corrupted, encrypted, or image-only. Verify the file and use OCR if it contains scanned pages without extractable text.
+
+### Results are empty or scores are unexpectedly low
+
+- Confirm that the uploaded files are supported PDF/DOCX documents.
+- Verify that text extraction returns non-empty content.
+- Check that job requirements and skills are entered correctly.
+- Review the preprocessing and scoring implementation.
+
+### Excel export fails
+
+Install the optional dependency if it is not already present:
+
+```bash
+python -m pip install openpyxl
+```
+
+### Render responds slowly
+
+A free instance may have spun down after inactivity. Allow time for it to start before concluding that the application is unavailable.
+
+### Authentication or database errors
+
+Check the private environment configuration, PostgreSQL connectivity, database permissions, migration status, and application logs. Do not expose passwords, session tokens, or database URLs when reporting errors.
+
+---
+
+## Future Improvements
+
+Possible improvements include:
+
+1. Semantic embeddings for more context-aware matching.
+2. Persistent vector storage for faster repeated screening.
+3. Parallel text extraction for large batches.
+4. Improved OCR support for scanned documents.
+5. More detailed explanations of why a resume matched a role.
+6. Improved monitoring, logging, and production observability.
+7. More extensive PostgreSQL integration and deployment tests.
+8. Additional report visualizations and analytics.
+
+These are potential future enhancements, not claims that all are currently implemented.
+
+---
+
+## Interview Explanation
+
+### Short explanation
+
+"I built a resume-screening application that extracts text from PDF and Word resumes, preprocesses the content, represents it using TF-IDF, and ranks resumes by cosine similarity combined with explicit skill matching. The project includes a web interface, bulk uploads, command-line execution, and report-export options."
+
+### Why TF-IDF?
+
+"TF-IDF is a lightweight and interpretable baseline for converting text into numerical features. It is relatively inexpensive to compute and works well for initial keyword-oriented matching. However, it has limitations when relevant skills are described using different wording."
+
+### Why cosine similarity?
+
+"Cosine similarity provides a way to compare the job-requirement vector with resume vectors. It helps rank resumes according to how closely their text representations match the job requirements."
+
+### How could it scale?
+
+"I would consider persisting computed vectors, parallelizing text extraction, introducing semantic embeddings, and using a suitable vector index for larger collections. I would also strengthen monitoring, privacy controls, and production testing."
+
+### One-minute project pitch
+
+"I developed a resume-screening system that automates the initial stage of candidate matching. It accepts PDF and DOCX resumes, extracts and preprocesses their text, converts the text into TF-IDF vectors, and calculates cosine similarity against job requirements. The scoring component combines similarity with explicit skill matching to produce a ranked list of candidates. The application supports a browser-based workflow, bulk uploads, a command-line interface, and result exports. The system is intended to assist human recruiters rather than replace their judgment."
+
+---
+
+## License
+
+Add a `LICENSE` file before distributing the source code commercially. Confirm that the project's dependencies and any included assets permit your intended distribution and licensing model.
+
+---
+
+## Live Application
+
+Try the deployed application here:
+
+**[Open Resume Screening Live Demo](https://resume-screening-14.onrender.com)**
+
