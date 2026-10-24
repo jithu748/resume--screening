@@ -43,6 +43,30 @@ The existing anonymous frontend continues to work only when `AUTH_REQUIRED=false
 
 CSV exports now contain only `rank`, `file`, `score`, `matched_skills`, and `missing_skills`; full resume text is not exported by default.
 
+## Local-only development demo mode
+
+The authentication controls may be hidden for a local demonstration only by
+setting `LOCAL_DEMO_MODE=true`. This mode is accepted only when
+`APP_ENV=development` and `AUTH_REQUIRED=false`. It also requires explicit
+HTTP loopback origins in `CORS_ALLOWED_ORIGINS`; wildcard origins are not
+allowed. The application rejects non-loopback clients while this mode is
+active.
+
+Start the demo with Uvicorn bound to loopback:
+
+```powershell
+$env:APP_ENV="development"
+$env:AUTH_REQUIRED="false"
+$env:LOCAL_DEMO_MODE="true"
+$env:CORS_ALLOWED_ORIGINS="http://127.0.0.1:8081"
+.\.venv\Scripts\python.exe -m uvicorn data.src.webapp:app --host 127.0.0.1 --port 8081
+```
+
+This mode is not suitable for public or production deployment. Upload,
+content, path, cleanup, and origin validation remain active. Anonymous demo
+sessions are intentionally unowned and temporary; authenticated production
+workflows continue to require user and agency ownership.
+
 ## Migration
 
 The migration is applied automatically at first authenticated use. SQLite uses [001_auth_and_tenant.sql](data/migrations/001_auth_and_tenant.sql); PostgreSQL uses [001_auth_and_tenant_postgres.sql](data/migrations/001_auth_and_tenant_postgres.sql). Both create agencies, users, memberships, authentication sessions, resume sessions/files, screening-result metadata, and agency invitations. Migration execution is recorded in `schema_migrations`.

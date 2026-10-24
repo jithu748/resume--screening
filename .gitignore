@@ -52,3 +52,11 @@ test_out.txt
 # Local authentication database
 *.sqlite3
 *.sqlite3-journal
+
+# Local review artifacts and patch helpers
+*.bak
+*.backup
+clean_debug_file.py
+helper_*.py
+patch_*.py
+webapp_diff_review.txt

@@ -28,6 +28,7 @@
   <!-- Main Mobile Container -->
   <main class="app-container">
 
+    {% if not local_demo_mode %}
     <!-- Authentication remains optional in explicitly configured development mode. -->
     <div class="card" id="auth-card">
       <h2 class="card-title">Agency account</h2>
@@ -48,6 +49,7 @@
       <button id="register-btn" class="btn-text" type="button">Create agency account</button>
       <button id="logout-btn" class="btn-text hidden" type="button">Sign out</button>
     </div>
+    {% endif %}
 
     <!-- Configuration Card -->
     <div class="card">

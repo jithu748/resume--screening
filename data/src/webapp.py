@@ -2,6 +2,8 @@ import os
 import sys
 import hashlib
 import hmac
+import ipaddress
+from urllib.parse import urlparse
 from fastapi import Depends, FastAPI, Request, Response, UploadFile, File, HTTPException, Query, Form
 import io
 import zipfile
@@ -67,6 +69,7 @@ def _env_bool(name: str, default: bool = False) -> bool:
 
 
 AUTH_REQUIRED = _env_bool("AUTH_REQUIRED", APP_ENV == "production")
+LOCAL_DEMO_MODE = _env_bool("LOCAL_DEMO_MODE", False)
 PRODUCTION_POSTGRES_ADAPTER_READY = auth_store.postgres_available()
 _configured_origins = [origin.strip().rstrip("/") for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if origin.strip()]
 if "*" in _configured_origins:
@@ -94,6 +97,42 @@ validate_production_configuration(
 )
 
 
+def validate_local_demo_configuration(
+    app_env: str,
+    local_demo_mode: bool,
+    auth_required: bool,
+    allowed_origins: list[str],
+) -> None:
+    """Allow anonymous screening only as an explicitly loopback-only demo."""
+    if not local_demo_mode:
+        return
+    if app_env != "development":
+        raise RuntimeError("LOCAL_DEMO_MODE is only allowed in development")
+    if auth_required:
+        raise RuntimeError("LOCAL_DEMO_MODE requires AUTH_REQUIRED=false")
+    if not allowed_origins:
+        raise RuntimeError("LOCAL_DEMO_MODE requires explicit loopback CORS origins")
+    for origin in allowed_origins:
+        parsed = urlparse(origin)
+        hostname = (parsed.hostname or "").lower()
+        is_loopback_name = hostname in {"localhost", "127.0.0.1", "::1"}
+        if (
+            parsed.scheme != "http"
+            or not is_loopback_name
+            or parsed.username
+            or parsed.password
+            or parsed.path not in {"", "/"}
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise RuntimeError("LOCAL_DEMO_MODE requires HTTP loopback origins only")
+
+
+validate_local_demo_configuration(
+    APP_ENV, LOCAL_DEMO_MODE, AUTH_REQUIRED, _configured_origins
+)
+
+
 def _ensure_auth_schema() -> None:
     if APP_ENV == "production" and not PRODUCTION_POSTGRES_ADAPTER_READY:
         raise RuntimeError("Production PostgreSQL authentication adapter is not available")
@@ -115,6 +154,22 @@ def _check_origin(request: Request) -> None:
     origin = request.headers.get("origin")
     if origin and origin.rstrip("/") not in CORS_ALLOWED_ORIGINS:
         raise HTTPException(status_code=403, detail="Origin is not allowed")
+
+
+def _is_loopback_client(host: Optional[str]) -> bool:
+    if not host:
+        return False
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host.lower() == "localhost"
+
+
+@app.middleware("http")
+async def enforce_local_demo_loopback(request: Request, call_next):
+    if LOCAL_DEMO_MODE and not _is_loopback_client(request.client.host if request.client else None):
+        return JSONResponse({"error": "Local demo mode accepts loopback clients only"}, status_code=403)
+    return await call_next(request)
 
 
 def _check_csrf(request: Request, principal: dict) -> None:
@@ -610,7 +665,10 @@ app.add_middleware(
 
 @app.get("/")
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "local_demo_mode": LOCAL_DEMO_MODE},
+    )
 
 
 _login_failures: dict[str, list[float]] = {}

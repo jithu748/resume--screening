@@ -195,6 +195,46 @@ def test_production_configuration_fails_closed():
     )
 
 
+def test_local_demo_configuration_requires_development_and_loopback_origins():
+    webapp.validate_local_demo_configuration(
+        "development", True, False, ["http://127.0.0.1:8081", "http://localhost:8081"]
+    )
+    with pytest.raises(RuntimeError):
+        webapp.validate_local_demo_configuration(
+            "production", True, False, ["http://127.0.0.1:8081"]
+        )
+    with pytest.raises(RuntimeError):
+        webapp.validate_local_demo_configuration(
+            "development", True, True, ["http://127.0.0.1:8081"]
+        )
+    with pytest.raises(RuntimeError):
+        webapp.validate_local_demo_configuration(
+            "development", True, False, ["https://public.example"]
+        )
+
+
+def test_local_demo_loopback_client_check():
+    assert webapp._is_loopback_client("127.0.0.1")
+    assert webapp._is_loopback_client("::1")
+    assert webapp._is_loopback_client("localhost")
+    assert not webapp._is_loopback_client("192.0.2.10")
+    assert not webapp._is_loopback_client(None)
+
+
+def test_local_demo_template_hides_authentication_controls():
+    rendered = webapp.templates.get_template("index.html").render(
+        request=None,
+        local_demo_mode=True,
+    )
+    assert 'id="auth-card"' not in rendered
+
+    rendered_authenticated_mode = webapp.templates.get_template("index.html").render(
+        request=None,
+        local_demo_mode=False,
+    )
+    assert 'id="auth-card"' in rendered_authenticated_mode
+
+
 def test_cors_allows_only_configured_origins(auth_client):
     allowed = auth_client.options("/api/auth/me", headers={"Origin": "http://localhost:8000", "Access-Control-Request-Method": "GET"})
     assert allowed.headers.get("access-control-allow-origin") == "http://localhost:8000"

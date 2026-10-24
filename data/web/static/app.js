@@ -46,8 +46,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultsList = document.getElementById('results-list');
 
   let currentSessionId = null;
+  const authCard = document.getElementById('auth-card');
   const authStatus = document.getElementById('auth-status');
   const logoutBtn = document.getElementById('logout-btn');
+  const loginBtn = document.getElementById('login-btn');
+  const registerBtn = document.getElementById('register-btn');
 
   function setAuthState(user, message) {
     const identity = user && (user.email || user.user);
@@ -75,33 +78,37 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('Authentication successful', 'success');
   }
 
-  document.getElementById('login-btn').addEventListener('click', async () => {
-    try {
-      await submitAuth('/api/auth/login', {
-        email: document.getElementById('auth-email').value,
-        password: document.getElementById('auth-password').value
-      });
-    } catch (err) { showToast(err.message, 'error'); }
-  });
+  if (loginBtn && registerBtn && authCard) {
+    loginBtn.addEventListener('click', async () => {
+      try {
+        await submitAuth('/api/auth/login', {
+          email: document.getElementById('auth-email').value,
+          password: document.getElementById('auth-password').value
+        });
+      } catch (err) { showToast(err.message, 'error'); }
+    });
 
-  document.getElementById('register-btn').addEventListener('click', async () => {
-    try {
-      await submitAuth('/api/auth/register', {
-        email: document.getElementById('auth-email').value,
-        password: document.getElementById('auth-password').value,
-        agency_name: document.getElementById('auth-agency').value
-      });
-    } catch (err) { showToast(err.message, 'error'); }
-  });
+    registerBtn.addEventListener('click', async () => {
+      try {
+        await submitAuth('/api/auth/register', {
+          email: document.getElementById('auth-email').value,
+          password: document.getElementById('auth-password').value,
+          agency_name: document.getElementById('auth-agency').value
+        });
+      } catch (err) { showToast(err.message, 'error'); }
+    });
+  }
 
-  logoutBtn.addEventListener('click', async () => {
-    try {
-      await apiFetch('/api/auth/logout', { method: 'POST' });
-      setAuthState(null, 'Signed out. Anonymous development mode remains available when enabled.');
-    } catch (err) { showToast(err.message, 'error'); }
-  });
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        await apiFetch('/api/auth/logout', { method: 'POST' });
+        setAuthState(null, 'Signed out. Anonymous development mode remains available when enabled.');
+      } catch (err) { showToast(err.message, 'error'); }
+    });
+  }
 
-  loadCurrentUser();
+  if (authCard) loadCurrentUser();
 
   // --- UI feedback: Toast Notifications ---
   function showToast(message, type = 'info') {
